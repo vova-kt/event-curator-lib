@@ -1,0 +1,13 @@
+node_modules/
+types/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+.vscode/
+.idea/

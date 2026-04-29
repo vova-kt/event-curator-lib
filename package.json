@@ -1,0 +1,49 @@
+{
+  "name": "events-curator",
+  "version": "0.0.0",
+  "description": "AI-curated upcoming events: pluggable search, LLM, storage, and ranking.",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./adapters/llm/openai": "./src/adapters/llm/openai.js",
+    "./adapters/search/tavily": "./src/adapters/search/tavily.js",
+    "./adapters/search/firecrawl": "./src/adapters/search/firecrawl.js",
+    "./adapters/search/playwright": "./src/adapters/search/playwright.js",
+    "./adapters/storage/sqlite": "./src/adapters/storage/sqlite.js",
+    "./adapters/storage/indexeddb": "./src/adapters/storage/indexeddb.js",
+    "./adapters/storage/memory": "./src/adapters/storage/memory.js",
+    "./strategies/dedupe": "./src/strategies/dedupe/index.js",
+    "./strategies/filter": "./src/strategies/filter/index.js",
+    "./strategies/rank": "./src/strategies/rank/index.js"
+  },
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "CLAUDE.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:types": "tsc",
+    "test": "node --test --test-reporter=spec test/**/*.test.js",
+    "example:script": "node examples/script.js",
+    "example:cli": "node examples/cli.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "openai": "^4.70.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
