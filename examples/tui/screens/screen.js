@@ -9,4 +9,5 @@ export const Screen = Object.freeze({
   EDITOR: 'editor',
   PROGRESS: 'progress',
   RESULTS: 'results',
+  DETAILS: 'details',
 });

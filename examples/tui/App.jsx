@@ -13,6 +13,7 @@ import KeysScreen from './screens/Keys.jsx';
 import SavedQueriesScreen from './screens/SavedQueries.jsx';
 import QueryEditorScreen from './screens/QueryEditor.jsx';
 import ResultsScreen from './screens/Results.jsx';
+import DetailsScreen from './screens/Details.jsx';
 import ProgressScreen from './screens/Progress.jsx';
 
 export default function App({ dry }) {
@@ -27,6 +28,9 @@ export default function App({ dry }) {
   const [progress, setProgress] = useState({});
   const [progressLabel, setProgressLabel] = useState('');
   const [results, setResults] = useState([]);
+  const [resultsCursor, setResultsCursor] = useState(0);
+  const [resultsMarks, setResultsMarks] = useState(/** @type {Record<string, 'like'|'dislike'>} */ ({}));
+  const [detailsIndex, setDetailsIndex] = useState(0);
   const [savedQueries, setSavedQueries] = useState(/** @type {import('../../src/core/types.js').SavedQuery[]} */ ([]));
   const [editing, setEditing] = useState(/** @type {null | import('../../src/core/types.js').SavedQuery} */ (null));
   const [activeQuery, setActiveQuery] = useState(/** @type {null | import('../../src/core/types.js').SavedQuery} */ (null));
@@ -130,6 +134,8 @@ export default function App({ dry }) {
         guidance: q.guidance,
       }, { onProgress });
       setResults(events);
+      setResultsCursor(0);
+      setResultsMarks({});
       await refreshSaved();
       setScreen(Screen.RESULTS);
     } catch (e) {
@@ -233,8 +239,31 @@ export default function App({ dry }) {
         {!error && screen === Screen.RESULTS && (
           <ResultsScreen
             events={results}
+            cursor={resultsCursor}
+            setCursor={setResultsCursor}
+            marks={resultsMarks}
+            setMarks={setResultsMarks}
             onSubmit={handleFeedback}
             onBack={() => setScreen(Screen.SAVED_LIST)}
+            onOpenDetails={(idx) => { setDetailsIndex(idx); setScreen(Screen.DETAILS); }}
+          />
+        )}
+
+        {!error && screen === Screen.DETAILS && (
+          <DetailsScreen
+            event={results[detailsIndex]}
+            mark={resultsMarks[results[detailsIndex]?.id]}
+            onToggleLike={() => {
+              const id = results[detailsIndex]?.id;
+              if (!id) return;
+              setResultsMarks({ ...resultsMarks, [id]: resultsMarks[id] === 'like' ? undefined : 'like' });
+            }}
+            onToggleDislike={() => {
+              const id = results[detailsIndex]?.id;
+              if (!id) return;
+              setResultsMarks({ ...resultsMarks, [id]: resultsMarks[id] === 'dislike' ? undefined : 'dislike' });
+            }}
+            onBack={() => setScreen(Screen.RESULTS)}
           />
         )}
 

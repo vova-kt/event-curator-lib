@@ -1,35 +1,34 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Box, Text, useInput } from 'ink';
 
 const PAGE_SIZE = 10;
 
-export default function ResultsScreen({ events, onSubmit, onBack }) {
-  const [cursor, setCursor] = useState(0);
-  const [marks, setMarks] = useState(/** @type {Record<string, 'like'|'dislike'>} */ ({}));
-
+export default function ResultsScreen({ events, cursor, setCursor, marks, setMarks, onSubmit, onBack, onOpenDetails }) {
   useInput((input, key) => {
     if (events.length === 0) {
       if (key.return || input === 'q' || key.escape) onBack();
       return;
     }
     if (key.upArrow || input === 'k') {
-      setCursor((c) => Math.max(0, c - 1));
+      setCursor(Math.max(0, cursor - 1));
     } else if (key.downArrow || input === 'j') {
-      setCursor((c) => Math.min(events.length - 1, c + 1));
+      setCursor(Math.min(events.length - 1, cursor + 1));
     } else if (key.pageUp || input === 'b') {
-      setCursor((c) => Math.max(0, c - PAGE_SIZE));
+      setCursor(Math.max(0, cursor - PAGE_SIZE));
     } else if (key.pageDown || input === 'f' || input === ' ') {
-      setCursor((c) => Math.min(events.length - 1, c + PAGE_SIZE));
+      setCursor(Math.min(events.length - 1, cursor + PAGE_SIZE));
     } else if (input === 'g') {
       setCursor(0);
     } else if (input === 'G') {
       setCursor(events.length - 1);
     } else if (input === 'l') {
       const id = events[cursor].id;
-      setMarks((m) => ({ ...m, [id]: m[id] === 'like' ? undefined : 'like' }));
+      setMarks({ ...marks, [id]: marks[id] === 'like' ? undefined : 'like' });
     } else if (input === 'd') {
       const id = events[cursor].id;
-      setMarks((m) => ({ ...m, [id]: m[id] === 'dislike' ? undefined : 'dislike' }));
+      setMarks({ ...marks, [id]: marks[id] === 'dislike' ? undefined : 'dislike' });
+    } else if (key.rightArrow || input === 'o') {
+      onOpenDetails(cursor);
     } else if (key.return) {
       const liked = Object.entries(marks).filter(([, v]) => v === 'like').map(([id]) => id);
       const disliked = Object.entries(marks).filter(([, v]) => v === 'dislike').map(([id]) => id);
@@ -86,7 +85,7 @@ export default function ResultsScreen({ events, onSubmit, onBack }) {
         })}
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>↑/↓ move · pgup/pgdn page · g/G top/bot · [l] like · [d] dislike · enter save · q/esc skip</Text>
+        <Text dimColor>↑/↓ move · pgup/pgdn page · g/G top/bot · →/o details · [l] like · [d] dislike · enter save · q/esc skip</Text>
       </Box>
     </Box>
   );
