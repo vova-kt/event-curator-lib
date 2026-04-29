@@ -229,7 +229,7 @@
  * @property {{ defaultLimit: number }} queryExpansion
  * @property {{ fuzzyTitleThreshold: number }} dedupe
  * @property {{ deriveTraits: boolean, traitsRefreshThreshold: number }} preferences
- * @property {{ level: 'silent'|'error'|'warn'|'info'|'debug' }} logging
+ * @property {{ level: 'silent'|'error'|'warn'|'info'|'debug', file: string|null }} logging
  */
 
 /**

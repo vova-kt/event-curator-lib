@@ -84,8 +84,15 @@ export const DEFAULTS = Object.freeze({
 
   /** Core logger configuration. */
   logging: {
-    /** Log level: 'silent' | 'error' | 'warn' | 'info' | 'debug'. */
+    /** Log level: 'silent' | 'error' | 'warn' | 'info' | 'debug'. Gates console output. */
     level: /** @type {'warn'} */ ('debug'),
+    /**
+     * Optional file path. When set (Node only), every logger call additionally
+     * appends a JSON Lines record `{ts, level, args}` to this file regardless
+     * of `level` — the file always captures debug-level detail. Browser
+     * environments silently skip file output. `null` disables file logging.
+     */
+    file: /** @type {string|null} */ ('curator.log'),
   },
 });
 

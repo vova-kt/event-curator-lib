@@ -47,7 +47,7 @@ export { EventState, EVENT_STATE_VALUES } from './core/eventState.js';
  */
 export async function createCurator(opts) {
   const config = mergeConfig(DEFAULTS, opts.config);
-  const logger = createLogger(config.logging.level);
+  const logger = createLogger(config.logging.level, config.logging.file);
   const strategies = {
     queryExpansion: opts.strategies?.queryExpansion ?? [
       llmExpand({ limit: config.queryExpansion.defaultLimit }),

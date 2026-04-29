@@ -4,6 +4,7 @@ import TextInput from 'ink-text-input';
 import { Key, char } from '../keys.js';
 import { Action } from '../actions.js';
 import { useKeymap } from '../useKeymap.js';
+import {DEFAULTS} from "../../../src/index.js";
 
 /**
  * @typedef {Object} EditorValues
@@ -53,9 +54,9 @@ const fromCsv = (s) => s.split(',').map((x) => x.trim()).filter((x) => x.length 
 export default function QueryEditorScreen({ existing, onSave, onSaveAndRun, onCancel }) {
   const [values, setValues] = useState(/** @type {EditorValues} */ ({
     queryText: existing?.queryText ?? '',
-    days: String(existing?.days ?? 14),
+    days: String(existing?.days ?? DEFAULTS.pipeline.defaultRollingDays),
     city: existing?.city ?? '',
-    limit: String(existing?.limit ?? 10),
+    limit: String(existing?.limit ?? DEFAULTS.pipeline.defaultLimit),
     excludeKeywords: csv(existing?.excludeKeywords ?? []),
     excludeVenues: csv(existing?.excludeVenues ?? []),
     priceMin: existing?.price?.min !== undefined ? String(existing.price.min) : '',

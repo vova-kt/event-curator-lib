@@ -17,7 +17,7 @@ ctx = {
   config,        // resolved config (defaults + overrides)
   query,         // current Query (with `savedQuery` auto-attached if a matching SavedQuery exists)
   signal,        // optional AbortSignal
-  logger,        // levelled logger built from config.logging.level
+  logger,        // levelled logger built from config.logging.{level,file} — file sink (Node only) captures all calls as JSON Lines regardless of console level
 }
 ```
 
