@@ -207,7 +207,6 @@
  * @typedef {Object} Strategies
  * @property {QueryExpansionStrategy[]} queryExpansion
  * @property {Strategy[]} dedupe
- * @property {Strategy[]} filter
  * @property {Strategy[]} rank
  */
 
@@ -232,7 +231,7 @@
  */
 
 /**
- * @typedef {'queries'|'search'|'extract'|'dedupe'|'filter'|'rank'|'persist'} ProgressStage
+ * @typedef {'queries'|'search'|'extract'|'dedupe'|'rank'|'persist'} ProgressStage
  *   Runtime values exported as the `ProgressStage` enum from core/progress.js.
  */
 

@@ -13,7 +13,7 @@ ctx = {
   llm,           // LLMAdapter
   search,        // SearchAdapter[]
   storage,       // StorageAdapter
-  strategies,    // { dedupe[], filter[], rank[] }
+  strategies,    // { queryExpansion[], dedupe[], rank[] }
   config,        // resolved config (defaults + overrides)
   query,         // current Query
   preference,    // current Preference, loaded once at pipeline start
@@ -51,21 +51,15 @@ Runs `ctx.strategies.dedupe` in order. Each strategy is a function `(events, ctx
 
 Cross-session dedupe also consults `ctx.storage.getShownIds()` to skip events the user has already been shown in past sessions (relevant for rolling timeframes). "Shown" is distinct from "stored": events still land in storage on every `curate()` (so `getEvents()` and feedback can resolve them), but only events the consumer explicitly persists via `curator.markShown(ids, { city, queryText })` are filtered out by dedupe. Discarded results from `curate()` and events that were never paged into in the UI stay eligible to resurface later.
 
-### 4. filter (`src/stages/filter.js`)
+### 4. rank (`src/stages/rank.js`)
 
-**In**: `Event[]` → **Out**: `Event[]`
+**In**: `Event[]` → **Out**: `Event[]` (filtered + sorted)
 
-Runs `ctx.strategies.filter` in order. Strategies receive the current `ctx.preference` and may drop events. Only `rules` (rule-based excludes) ships by default — soft, preference-based filtering is folded into the rank stage so it shares a single LLM call with ranking.
+Runs `ctx.strategies.rank` in order — there is no separate filter stage. Strategies receive the current `ctx.preference` and may both drop events and reorder them. Last one wins. The rank stage itself does not truncate — the orchestrator slices to `ctx.query.limit ?? ctx.config.pipeline.defaultLimit` after rank returns.
 
-### 5. rank (`src/stages/rank.js`)
+The default rank chain in `createCurator` is `[rules, byDate]`: `rules` applies hard rule-based excludes (`excludeKeywords`, `excludeVenues`, price bounds), then `byDate` orders chronologically. The example TUI opts into `[rules, llmRank]`: `rules` strips hard excludes first, then `llmRank` runs as a combined filter + rank LLM pass — events it judges to be poor matches against the user's preferences and `Query.guidance` (the natural-language filter + rank field) are omitted from the output (so the rank stage may shrink the list), and each kept event carries an ~5-word `rationale`.
 
-**In**: `Event[]` → **Out**: `Event[]` (sorted)
-
-Runs `ctx.strategies.rank` in order. Each strategy returns a re-ordered list. Last one wins. The rank stage itself does not truncate — the orchestrator slices to `ctx.query.limit ?? ctx.config.pipeline.defaultLimit` after rank returns.
-
-When `llmRank` is the active strategy it acts as a combined filter + rank pass: events the LLM judges to be poor matches against the user's preferences and `Query.guidance` (the natural-language filter + rank field) are omitted from the output (so the rank stage may shrink the list), and each kept event carries an ~5-word `rationale`. The default in `createCurator` is the cheap `byDate` strategy; the example TUI opts into `llmRank` explicitly so saved-query guidance and rationales flow through.
-
-### 6. feedback (`src/stages/feedback.js`)
+### 5. feedback (`src/stages/feedback.js`)
 
 **In**: `{ liked: string[], disliked: string[] }`, last result set → **Out**: updated preference persisted to storage.
 
@@ -80,8 +74,7 @@ async function runCuration(ctx) {
   const hits = await discover(ctx);            // discover emits 'queries' + 'search' itself
   let events = await extract(hits, ctx);       // orchestrator emits extract start/done; stage emits ticks
   events = await dedupe(events, ctx);          // orchestrator emits dedupe start/done
-  events = await filter(events, ctx);          // orchestrator emits filter start/done
-  events = await rank(events, ctx);            // orchestrator emits rank start/done
+  events = await rank(events, ctx);            // orchestrator emits rank start/done — strategies drop + reorder
   events = events.slice(0, ctx.query.limit ?? ctx.config.pipeline.defaultLimit);
   if (events.length > 0) await ctx.storage.upsertEvents(events); // orchestrator emits persist start/done
   return events;
@@ -104,7 +97,7 @@ curator.curate(query, {
 
 | Field    | Notes                                                                           |
 | -------- | ------------------------------------------------------------------------------- |
-| `stage`  | `ProgressStage` enum value (`queries`, `search`, `extract`, `dedupe`, `filter`, `rank`, `persist`) |
+| `stage`  | `ProgressStage` enum value (`queries`, `search`, `extract`, `dedupe`, `rank`, `persist`) |
 | `phase`  | `ProgressPhase` enum value (`start`, `tick`, `done`)                             |
 | `total`  | items expected (on `start` and `tick`)                                           |
 | `current`| items processed so far (on `tick`)                                               |
@@ -113,7 +106,7 @@ curator.curate(query, {
 
 The runtime enum values live in [src/core/progress.js](../src/core/progress.js) — import `ProgressStage` and `ProgressPhase` from there rather than hard-coding the strings. `PROGRESS_STAGE_ORDER` is also exported for UIs that render stages in pipeline order.
 
-Emission contract per stage: exactly one `start`, zero or more `tick`s, exactly one `done`. `extract` and `search` emit `tick`s; the rest only emit `start`/`done`. The listener is plumbed through `ctx.onProgress`. The `discover` stage emits its own `queries` and `search` events (start/tick/done) internally; for `extract`, `dedupe`, `filter`, `rank`, and `persist` the orchestrator (`src/core/pipeline.js`) emits `start` and `done` around the stage call, and the stage itself only emits `tick`s where applicable. The `persist` `start` event has no `total` (item count is unknown until the slice happens just before it).
+Emission contract per stage: exactly one `start`, zero or more `tick`s, exactly one `done`. `extract` and `search` emit `tick`s; the rest only emit `start`/`done`. The listener is plumbed through `ctx.onProgress`. The `discover` stage emits its own `queries` and `search` events (start/tick/done) internally; for `extract`, `dedupe`, `rank`, and `persist` the orchestrator (`src/core/pipeline.js`) emits `start` and `done` around the stage call, and the stage itself only emits `tick`s where applicable. The `persist` `start` event has no `total` (item count is unknown until the slice happens just before it).
 
 ## Adding a stage
 

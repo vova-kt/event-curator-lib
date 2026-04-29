@@ -5,7 +5,6 @@
 import { discover } from '../stages/discover.js';
 import { extract } from '../stages/extract.js';
 import { dedupe } from '../stages/dedupe.js';
-import { filter } from '../stages/filter.js';
 import { rank } from '../stages/rank.js';
 import { ProgressStage, ProgressPhase } from './progress.js';
 
@@ -34,16 +33,11 @@ export async function runCuration(ctx) {
   emit({ stage: ProgressStage.DEDUPE, phase: ProgressPhase.DONE, count: events.length });
   log.info(`[pipeline] dedupe → ${events.length} events (dropped ${beforeDedupe - events.length})`);
 
-  emit({ stage: ProgressStage.FILTER, phase: ProgressPhase.START, total: events.length });
-  const beforeFilter = events.length;
-  events = await filter(events, ctx);
-  emit({ stage: ProgressStage.FILTER, phase: ProgressPhase.DONE, count: events.length });
-  log.info(`[pipeline] filter → ${events.length} events (dropped ${beforeFilter - events.length})`);
-
   emit({ stage: ProgressStage.RANK, phase: ProgressPhase.START, total: events.length });
+  const beforeRank = events.length;
   events = await rank(events, ctx);
   emit({ stage: ProgressStage.RANK, phase: ProgressPhase.DONE, count: events.length });
-  log.info(`[pipeline] rank → ${events.length} events`);
+  log.info(`[pipeline] rank → ${events.length} events (dropped ${beforeRank - events.length})`);
 
   const limit = ctx.query.limit ?? ctx.config.pipeline.defaultLimit;
   events = events.slice(0, limit);

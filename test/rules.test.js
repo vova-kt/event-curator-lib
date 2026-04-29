@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rules } from '../src/strategies/filter/rules.js';
+import { rules } from '../src/strategies/rank/rules.js';
 import { makeEvent } from './_helpers.js';
 
 /**

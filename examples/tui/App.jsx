@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import { createCurator, llmRank } from '../../src/index.js';
+import { createCurator, llmRank, rules } from '../../src/index.js';
 import { sqlite } from '../../src/adapters/storage/sqlite.js';
 import { memory } from '../../src/adapters/storage/memory.js';
 import { openai } from '../../src/adapters/llm/openai.js';
@@ -88,8 +88,9 @@ export default function App({ dry }) {
     const search = dry ? [stubSearch()] : [tavily({ apiKey: keys.tavilyApiKey })];
     const storage = dry ? memory() : sqlite({ path: keys.dbPath });
     // The TUI opts into LLM rank so saved-query guidance and 5-word
-    // rationales actually flow through.
-    const c = await createCurator({ llm, search, storage, strategies: { rank: [llmRank] } });
+    // rationales actually flow through. `rules` runs first to apply hard
+    // exclude filters before the LLM ranker sees the list.
+    const c = await createCurator({ llm, search, storage, strategies: { rank: [rules, llmRank] } });
     setCurator(c);
     await refreshSaved(c);
     setScreen(Screen.SAVED_LIST);

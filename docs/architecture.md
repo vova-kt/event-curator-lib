@@ -2,7 +2,7 @@
 
 ## One-line model
 
-A curator is a **pipeline** wrapping three pluggable I/O adapters (search, LLM, storage) and three pluggable algorithmic strategies (dedupe, filter, rank). Adapters are how we talk to the outside world. Strategies are how we shape the result set. Stages are where the work actually happens.
+A curator is a **pipeline** wrapping three pluggable I/O adapters (search, LLM, storage) and pluggable algorithmic strategies (query expansion, dedupe, rank). Adapters are how we talk to the outside world. Strategies are how we shape the result set. Stages are where the work actually happens. Filtering is not a separate stage — rank strategies may both drop and reorder events.
 
 ## Layers
 
@@ -16,11 +16,10 @@ A curator is a **pipeline** wrapping three pluggable I/O adapters (search, LLM, 
 │                    ├── src/stages/discover.js          │
 │                    ├── src/stages/extract.js           │
 │                    ├── src/stages/dedupe.js            │
-│                    ├── src/stages/filter.js            │
 │                    ├── src/stages/rank.js              │
 │                    └── src/stages/feedback.js          │
 ├────────────────────────────────────────────────────────┤
-│ strategies       src/strategies/{dedupe,filter,rank}/  │
+│ strategies       src/strategies/{queryExpansion,dedupe,rank}/ │
 ├────────────────────────────────────────────────────────┤
 │ adapters         src/adapters/{search,llm,storage}/    │
 ├────────────────────────────────────────────────────────┤
@@ -51,11 +50,11 @@ Higher layers depend on lower ones, never the other way around. Stages depend on
 ## Data flow
 
 ```
-Query  ─▶  discover  ─▶  extract  ─▶  dedupe  ─▶  filter  ─▶  rank  ─▶  Result
-            │              │            │           │          │
-            ▼              ▼            ▼           ▼          ▼
-         search         LLM +        strategies  strategies  strategies
-         adapter        browser                  + prefs     + prefs
+Query  ─▶  discover  ─▶  extract  ─▶  dedupe  ─▶  rank  ─▶  Result
+            │              │            │          │
+            ▼              ▼            ▼          ▼
+         search         LLM +        strategies  strategies (rules + byDate/llmRank)
+         adapter        browser                  + prefs (drops + reorders)
                                           │
                                           ▼
                                        storage  ◀── feedback (likes/dislikes)

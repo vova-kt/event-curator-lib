@@ -7,13 +7,11 @@ import { createLogger } from './core/logger.js';
 import { runCuration } from './core/pipeline.js';
 import { recordFeedback } from './stages/feedback.js';
 import { byId, fuzzyTitle } from './strategies/dedupe/index.js';
-import { rules } from './strategies/filter/index.js';
-import { byDate, llmRank } from './strategies/rank/index.js';
+import { byDate, llmRank, rules } from './strategies/rank/index.js';
 import { llmExpand, templates } from './strategies/queryExpansion/index.js';
 
 export { DEFAULTS } from './core/config.js';
-export { llmRank, byDate } from './strategies/rank/index.js';
-export { rules } from './strategies/filter/index.js';
+export { llmRank, byDate, rules } from './strategies/rank/index.js';
 
 /**
  * @typedef {Object} CreateCuratorOptions
@@ -57,8 +55,7 @@ export async function createCurator(opts) {
       templates(),
     ],
     dedupe: opts.strategies?.dedupe ?? [byId, fuzzyTitle({ threshold: config.dedupe.fuzzyTitleThreshold })],
-    filter: opts.strategies?.filter ?? [rules],
-    rank:   opts.strategies?.rank   ?? [byDate],
+    rank:   opts.strategies?.rank   ?? [rules, byDate],
   };
 
   await opts.storage.init();

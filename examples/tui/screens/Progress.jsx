@@ -9,7 +9,6 @@ const STAGE_LABELS = {
   [ProgressStage.SEARCH]:  'search the web',
   [ProgressStage.EXTRACT]: 'extract events',
   [ProgressStage.DEDUPE]:  'dedupe',
-  [ProgressStage.FILTER]:  'filter',
   [ProgressStage.RANK]:    'rank',
   [ProgressStage.PERSIST]: 'save',
 };

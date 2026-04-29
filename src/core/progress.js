@@ -8,7 +8,6 @@ export const ProgressStage = Object.freeze({
   SEARCH:  'search',
   EXTRACT: 'extract',
   DEDUPE:  'dedupe',
-  FILTER:  'filter',
   RANK:    'rank',
   PERSIST: 'persist',
 });
@@ -26,7 +25,6 @@ export const PROGRESS_STAGE_ORDER = Object.freeze([
   ProgressStage.SEARCH,
   ProgressStage.EXTRACT,
   ProgressStage.DEDUPE,
-  ProgressStage.FILTER,
   ProgressStage.RANK,
   ProgressStage.PERSIST,
 ]);
