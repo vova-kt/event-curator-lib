@@ -20,6 +20,7 @@ test('createCurator: full pipeline returns events from stub adapters', async () 
             startsAt: '2026-05-02T20:00:00+00:00',
             venue: { name: 'Test Café', city: 'Berlin' },
             category: 'comedy',
+            source: { name: 'stub', url: 'https://example.com/listing' },
           },
         ],
       };
@@ -58,6 +59,7 @@ test('createCurator: cross-session dedupe via storage', async () => {
           startsAt: '2026-05-02T20:00:00+00:00',
           venue: { name: 'Café', city: 'Berlin' },
           category: 'comedy',
+          source: { name: 'stub', url: 'https://x.example.com' },
         },
       ],
     };
@@ -104,7 +106,7 @@ test('createCurator: recordFeedback persists likes scoped by query', async () =>
     if (req.system.includes('extract structured upcoming events')) {
       return {
         events: [
-          { title: 'A', startsAt: '2026-05-02T20:00:00+00:00', venue: { name: 'V', city: 'Berlin' }, category: 'comedy' },
+          { title: 'A', startsAt: '2026-05-02T20:00:00+00:00', venue: { name: 'V', city: 'Berlin' }, category: 'comedy', source: { name: 'stub', url: 'https://x.example.com' } },
         ],
       };
     }

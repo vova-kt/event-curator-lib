@@ -1,5 +1,8 @@
+import { buildSystem } from './_system.js';
+
 /**
  * @typedef {Object} ExtractPage
+ * @property {string} sourceName
  * @property {string} sourceUrl
  * @property {string} pageText
  */
@@ -15,59 +18,86 @@
 /**
  * Build the extract-events prompt. The LLM receives one or more pages in a
  * single request and returns a JSON object with `events: Event[]`, where each
- * event carries the `sourceUrl` of the page it was extracted from.
+ * event echoes back the `source.name` and `source.url` of the page it was
+ * extracted from.
+ *
+ * Page text can be large, so this prompt applies the long-input exception
+ * documented in docs/prompts_guide.md: the bulk `<pages>` block sits at the
+ * top of the user message, with the short query recap at the bottom.
  *
  * @param {ExtractEventsArgs} args
  * @returns {{ system: string, user: string }}
  */
 export function extractEventsPrompt({ city, category, timeframe, pages }) {
-  const system =
-    'You extract structured upcoming events from web content. ' +
-    'Return strict JSON. Skip past events, generic listings, or content that is not an event. ' +
-    'A single request may include multiple pages — return events from all of them, tagging each with its source URL. ' +
-    'If a single page describes multiple events, return all of them. If unsure, omit the event.';
+  const system = buildSystem({
+    role: 'You extract structured upcoming events from web content.',
+    task: [
+      'Read the supplied pages and return the events they describe as JSON. ' +
+      'A single request may include multiple pages — return events from all of them. ' +
+      'If a single page describes multiple events, return all of them.'
+    ].join('\n'),
+    rules: [
+      '- Return only events whose startsAt is within the user\'s Timeframe.',
+      '- Return only events in or near the user\'s City.',
+      '- Treat the user\'s Category as the topic focus: prefer events that fit it; skip clearly unrelated events.',
+      '- Omit any event you cannot date precisely (no "TBD", no "soon").',
+      '- Skip past events, generic listings, and content that is not an event.',
+      '- Do not invent details. Leave fields out rather than guess.',
+      '- For each event, set source.name and source.url to the SOURCE_NAME and SOURCE_URL of the page it was extracted from, copied verbatim. Never substitute another URL mentioned inside the page content. If one page yields multiple events, every event repeats the same source.',
+      '- If unsure whether something is an event, omit it.',
+    ].join('\n'),
+    inputFormat: [
+      'The user message contains, in order:',
+      '  1. A <pages> block holding one or more <page> entries. Each <page> has:',
+      '       <source_name>opaque adapter id; echo verbatim</source_name>',
+      '       <source_url>page url; echo verbatim</source_url>',
+      '       <content>raw page text</content>',
+      '  2. A <query> block with the user\'s preferences:',
+      '       <city>...</city>',
+      '       <category>...</category>',
+      '       <timeframe from="ISO" to="ISO" />',
+    ].join('\n'),
+    outputFormat: [
+      'Strict JSON of shape:',
+      '{ "events": [',
+      '  { "title": string,',
+      '    "description": string?,',
+      '    "startsAt": ISO 8601 datetime string,',
+      '    "endsAt": ISO 8601 datetime string?,',
+      '    "venue": { "name": string, "address": string?, "city": string, "country": string? },',
+      '    "category": string,',
+      '    "subcategories": string[]?,',
+      '    "source": { "name": string, "url": string },',
+      '    "price": { "currency": string?, "min": number?, "max": number?, "free": boolean? }?',
+      '  }',
+      '] }',
+    ].join('\n'),
+  });
 
   const pagesBlock = pages
-    .map((p, i) =>
+    .map((p) =>
       [
-        `--- PAGE ${i + 1} ---`,
-        `PAGE_INDEX: ${i + 1}`,
-        `SOURCE_URL: ${p.sourceUrl}`,
-        'CONTENT:',
+        '  <page>',
+        `    <source_name>${p.sourceName}</source_name>`,
+        `    <source_url>${p.sourceUrl}</source_url>`,
+        '    <content>',
         p.pageText,
+        '    </content>',
+        '  </page>',
       ].join('\n'),
     )
-    .join('\n\n');
+    .join('\n');
 
   const user = [
-    `City: ${city}`,
-    `Category: ${category}`,
-    `Timeframe: ${timeframe.from} to ${timeframe.to}`,
-    '',
-    'Pages:',
+    '<pages>',
     pagesBlock,
+    '</pages>',
     '',
-    'Return JSON of shape:',
-    '{ "events": [',
-    '  { "pageIndex": integer,  // 1-based, must equal the PAGE_INDEX of the page this event came from',
-    '    "sourceUrl": string,   // must equal that page\'s SOURCE_URL (used to cross-check pageIndex)',
-    '    "title": string,',
-    '    "description": string?,',
-    '    "startsAt": ISO 8601 datetime string,',
-    '    "endsAt": ISO 8601 datetime string?,',
-    '    "venue": { "name": string, "address": string?, "city": string, "country": string? },',
-    '    "category": string,',
-    '    "subcategories": string[]?,',
-    '    "price": { "currency": string?, "min": number?, "max": number?, "free": boolean? }?',
-    '  }',
-    '] }',
-    '',
-    'Rules:',
-    `- Only events whose startsAt is within the timeframe.`,
-    `- Only events in or near "${city}".`,
-    '- Omit any event you cannot date precisely (no "TBD", no "soon").',
-    '- Do not invent details. Leave fields out rather than guess.',
-    '- Set pageIndex and sourceUrl on each event to the PAGE_INDEX and SOURCE_URL of the page it was extracted from. If a page yields multiple events, repeat its pageIndex on each.',
+    '<query>',
+    `  <city>${city}</city>`,
+    `  <category>${category}</category>`,
+    `  <timeframe from="${timeframe.from}" to="${timeframe.to}" />`,
+    '</query>',
   ].join('\n');
 
   return { system, user };

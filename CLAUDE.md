@@ -24,6 +24,7 @@ The `docs/` directory is the canonical reference. Read the page that matches you
 - [docs/strategies.md](docs/strategies.md) — pluggable dedupe / filter / rank strategy contracts
 - [docs/storage.md](docs/storage.md) — schema, SQLite vs IndexedDB vs memory
 - [docs/prompts.md](docs/prompts.md) — where prompts live, the `({...args}) => {system, user}` shape, how to add one
+- [docs/prompts_guide.md](docs/prompts_guide.md) — authoring rules: XML-tagged section order, long-input exception, model-specific notes
 - [docs/preferences.md](docs/preferences.md) — preference shape, like/dislike capture, scoped clearing
 - [docs/config.md](docs/config.md) — defaults, override merge order, env-var bindings
 - [docs/examples.md](docs/examples.md) — running the script and CLI examples

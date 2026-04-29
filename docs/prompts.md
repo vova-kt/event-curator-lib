@@ -11,34 +11,18 @@ All LLM prompts live as their own files under `src/prompts/`. Each file exports 
 
 ## Shape
 
-```js
-/**
- * @param {ExtractEventsArgs} args
- * @returns {{ system: string, user: string }}
- */
-export function extractEventsPrompt({ pageText, city, category, timeframe }) {
-  return {
-    system: 'You extract structured events from web content. Return strict JSON.',
-    user: [
-      `City: ${city}`,
-      `Category: ${category}`,
-      `Timeframe: ${timeframe.from} → ${timeframe.to}`,
-      '',
-      'Content:',
-      pageText,
-      '',
-      'Return JSON: { "events": [{ id, title, startsAt, venue: {...}, ... }] }',
-    ].join('\n'),
-  };
-}
-```
+Each prompt file exports a function `({ ...args }) => ({ system, user })`. Read the actual files under `src/prompts/` for working examples — don't reproduce them here, the duplicates rot.
 
 Conventions:
 
 - Prompt functions are named `<concept>Prompt`.
 - All inputs are explicit parameters. No env-var reads, no module-level state.
-- Output schema is described inline in the `user` portion. The LLM adapter handles JSON-mode wiring.
+- The `system` portion carries the static contract — role, task, rules, input format, output format, and any examples. The `user` portion carries only the per-call data (user preferences and content). The LLM adapter handles JSON-mode wiring.
 - Prefer concrete examples over instructions when behavior is non-obvious.
+
+## Authoring rules
+
+The full structure (XML-tagged sections, ordering, the long-input exception, model-specific notes for `gpt-5.5-mini` / `gpt-5.5` / Sonnet 4.6 / Opus 4.7) lives in [prompts_guide.md](./prompts_guide.md). Read it before writing or editing a prompt.
 
 ## Built-in prompts
 

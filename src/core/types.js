@@ -50,7 +50,6 @@
  * @property {string[]} [subcategories]
  * @property {EventSource} source
  * @property {EventPrice} [price]
- * @property {string} [raw]              // source text snippet for the LLM
  * @property {string} [rationale]        // LLM's "why this matches" line
  * @property {string} [firstSeenAt]
  * @property {string} [lastSeenAt]

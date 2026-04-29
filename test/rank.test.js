@@ -46,7 +46,7 @@ test('llmRank: rankGuidance alone triggers the LLM and drops omitted events', as
   } }));
   assert.deepEqual(out.map((e) => e.id), [c.id, a.id]);
   assert.equal(out[0].rationale, 'fits guidance well today');
-  assert.match(captured.messages[0].content, /User guidance: prefer intimate venues/);
+  assert.match(captured.messages[0].content, /<guidance>prefer intimate venues<\/guidance>/);
 });
 
 test('llmRank: empty/invalid response falls back to all events in original order', async () => {

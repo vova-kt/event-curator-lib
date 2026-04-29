@@ -6,9 +6,9 @@
 export const DEFAULTS = Object.freeze({
   dev: false,
   llm: {
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.5-mini',
     temperature: 0.2,
-    maxTokens: 4096,
+    maxTokens: 16000,
   },
   search: {
     maxResultsPerAdapter: 20,

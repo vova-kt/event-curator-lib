@@ -5,6 +5,9 @@
  * stay within `pipeline.extractBatchTokenCap`. Tokens are estimated as
  * ceil(chars / pipeline.charsPerToken). Each batch is one LLM call.
  *
+ * The LLM echoes each page's source name and URL back on every event it
+ * yields, so we don't need to map events to input pages ourselves.
+ *
  * Per-batch failures are isolated so one broken request doesn't fail the run.
  * See docs/pipeline.md.
  */
@@ -112,28 +115,6 @@ function batchPages(pages, batchTokenCap, charsPerToken) {
 }
 
 /**
- * Resolve which page in the batch an LLM-returned event came from.
- *
- * Primary key: 1-based `pageIndex`. Cross-check: `sourceUrl` must agree with
- * the indexed page's URL when both are present. If they disagree, fall back
- * to URL lookup (the LLM likely got one field right and the other wrong).
- * As a last resort, single-page batches attribute untagged events to the
- * sole page.
- *
- * @param {{ pageIndex?: number, sourceUrl?: string }} r
- * @param {PreparedPage[]} batch
- * @param {Map<string, PreparedPage>} byUrl
- * @returns {PreparedPage | undefined}
- */
-function matchPage(r, batch, byUrl) {
-  const idx = Number.isInteger(r.pageIndex) ? /** @type {number} */ (r.pageIndex) - 1 : -1;
-  const byIndex = idx >= 0 && idx < batch.length ? batch[idx] : undefined;
-  const byUrlMatch = r.sourceUrl ? byUrl.get(r.sourceUrl) : undefined;
-  if (byIndex && byUrlMatch) return byIndex === byUrlMatch ? byIndex : byUrlMatch;
-  return byIndex ?? byUrlMatch ?? (batch.length === 1 ? batch[0] : undefined);
-}
-
-/**
  * @param {PreparedPage[]} batch
  * @param {import('../core/types.js').Ctx} ctx
  * @param {{ from: string, to: string }} timeframe
@@ -144,7 +125,11 @@ async function extractFromBatch(batch, ctx, timeframe) {
     city: ctx.query.city,
     category: String(ctx.query.category),
     timeframe,
-    pages: batch.map(({ hit, pageText }) => ({ sourceUrl: hit.url, pageText })),
+    pages: batch.map(({ hit, pageText }) => ({
+      sourceName: hit.source,
+      sourceUrl: hit.url,
+      pageText,
+    })),
   });
 
   const resp = await ctx.llm.chat({
@@ -154,19 +139,17 @@ async function extractFromBatch(batch, ctx, timeframe) {
     signal: ctx.signal,
   });
 
-  const json = /** @type {{ events?: Array<Partial<import('../core/types.js').Event> & { pageIndex?: number, sourceUrl?: string }> }} */ (
+  const json = /** @type {{ events?: Array<Partial<import('../core/types.js').Event>> }} */ (
     resp.json ?? {}
   );
   const raws = Array.isArray(json.events) ? json.events : [];
   const fetchedAt = new Date().toISOString();
-  const byUrl = new Map(batch.map((p) => [p.hit.url, p]));
 
   /** @type {import('../core/types.js').Event[]} */
   const events = [];
   for (const r of raws) {
     if (!r.title || !r.startsAt || !r.venue?.name || !r.venue?.city) continue;
-    const matched = matchPage(r, batch, byUrl);
-    if (!matched) continue;
+    if (!r.source?.name || !r.source?.url) continue;
     events.push({
       id: eventId({ title: r.title, startsAt: r.startsAt, venue: r.venue }),
       title: r.title,
@@ -176,9 +159,8 @@ async function extractFromBatch(batch, ctx, timeframe) {
       venue: r.venue,
       category: r.category ?? ctx.query.category,
       subcategories: r.subcategories,
-      source: { name: matched.hit.source, url: matched.hit.url, fetchedAt },
+      source: { name: r.source.name, url: r.source.url, fetchedAt },
       price: r.price,
-      raw: matched.pageText.slice(0, 1000),
     });
   }
   return events;

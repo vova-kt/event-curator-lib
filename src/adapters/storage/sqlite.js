@@ -18,7 +18,6 @@ const SCHEMA = `
     source_json TEXT NOT NULL,
     price_json TEXT,
     subcategories_json TEXT,
-    raw TEXT,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL
   );
@@ -85,11 +84,11 @@ export function sqlite({ path }) {
       const stmt = d.prepare(`
         INSERT INTO events (
           id, title, description, starts_at, ends_at, city, category,
-          venue_json, source_json, price_json, subcategories_json, raw,
+          venue_json, source_json, price_json, subcategories_json,
           first_seen_at, last_seen_at
         ) VALUES (
           @id, @title, @description, @starts_at, @ends_at, @city, @category,
-          @venue_json, @source_json, @price_json, @subcategories_json, @raw,
+          @venue_json, @source_json, @price_json, @subcategories_json,
           @first_seen_at, @last_seen_at
         )
         ON CONFLICT(id) DO UPDATE SET
@@ -101,7 +100,6 @@ export function sqlite({ path }) {
           source_json = excluded.source_json,
           price_json = excluded.price_json,
           subcategories_json = excluded.subcategories_json,
-          raw = excluded.raw,
           last_seen_at = excluded.last_seen_at
       `);
       const tx = d.transaction((rows) => {
@@ -269,7 +267,6 @@ export function sqlite({ path }) {
  * @property {string} source_json
  * @property {string|null} price_json
  * @property {string|null} subcategories_json
- * @property {string|null} raw
  * @property {string} first_seen_at
  * @property {string} last_seen_at
  */
@@ -301,7 +298,6 @@ function eventToRow(e, now) {
     source_json: JSON.stringify(e.source),
     price_json: e.price ? JSON.stringify(e.price) : null,
     subcategories_json: e.subcategories ? JSON.stringify(e.subcategories) : null,
-    raw: e.raw ?? null,
     first_seen_at: e.firstSeenAt ?? now,
     last_seen_at: now,
   };
@@ -323,7 +319,6 @@ function rowToEvent(row) {
     source: JSON.parse(row.source_json),
     price: row.price_json ? JSON.parse(row.price_json) : undefined,
     subcategories: row.subcategories_json ? JSON.parse(row.subcategories_json) : undefined,
-    raw: row.raw ?? undefined,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
   };
