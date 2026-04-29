@@ -2,6 +2,8 @@ import { buildSystem } from './_system.js';
 
 /**
  * @typedef {Object} RankByPreferenceArgs
+ * @property {string} city
+ * @property {string} queryText
  * @property {Array<{ id: string, title: string, venue: { name: string, city: string }, startsAt: string }>} candidates
  * @property {Array<{ title: string, venue: { name: string, city: string } }>} liked
  * @property {Array<{ title: string, venue: { name: string, city: string } }>} disliked
@@ -21,16 +23,17 @@ import { buildSystem } from './_system.js';
  * @param {RankByPreferenceArgs} args
  * @returns {{ system: string, user: string }}
  */
-export function rankByPreferencePrompt({ candidates, liked, disliked, derivedTraits, guidance }) {
+export function rankByPreferencePrompt({ city, queryText, candidates, liked, disliked, derivedTraits, guidance }) {
   const system = buildSystem({
     role: 'You filter and rank events for a single user in one pass.',
     task: [
-        'Drop candidate events that clearly do not fit the user\'s preferences or stated guidance — omission is how you filter. ' +
+        'Drop candidate events that clearly do not fit the user\'s original search topic, preferences, or stated guidance — omission is how you filter. ' +
         'For each kept event, attach a rationale of about five words explaining the choice.' +
         ' Order kept events by likely interest, highest first.'
     ].join('\n'),
     rules: [
-      '- Omit events that contradict <guidance> or that the <liked>/<disliked>/<traits> signals say the user will dislike.',
+      '- The <query> block is the user\'s original search topic — the primary filter signal. Omit events that are off-topic for that query, even if no <guidance> is given.',
+      '- Also omit events that contradict <guidance> or that the <liked>/<disliked>/<traits> signals say the user will dislike.',
       '- The <guidance> covers BOTH filtering (omit) and ranking (order). Filter first, then rank what remains.',
       '- Keep events that match the user\'s clear interests, even when imperfect.',
       '- When uncertain, prefer to keep the event but rank it lower.',
@@ -40,7 +43,8 @@ export function rankByPreferencePrompt({ candidates, liked, disliked, derivedTra
     ].join('\n'),
     inputFormat: [
       'The user message contains, in order, any of these XML blocks (some may be omitted when empty):',
-      '  <guidance>free-form filter-and-rank instructions from the user (e.g. "no metal, prefer small venues, weeknights ok")</guidance>',
+      '  <query>the user\'s original search: city and freeform query text (e.g. "indie live music")</query>',
+      '  <guidance>free-form filter-and-rank refinements from the user (e.g. "no metal, prefer small venues, weeknights ok")</guidance>',
       '  <traits>one-line summary of the user\'s long-term preferences</traits>',
       '  <liked>JSON array of liked example events</liked>',
       '  <disliked>JSON array of disliked example events</disliked>',
@@ -54,6 +58,7 @@ export function rankByPreferencePrompt({ candidates, liked, disliked, derivedTra
   });
 
   const user = [
+    `<query>city: ${city}\ntext: ${queryText}</query>`,
     guidance ? `<guidance>${guidance}</guidance>` : null,
     derivedTraits ? `<traits>${derivedTraits}</traits>` : null,
     '<liked>',
