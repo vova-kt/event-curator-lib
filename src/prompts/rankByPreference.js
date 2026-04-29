@@ -2,9 +2,9 @@ import { buildSystem } from './_system.js';
 
 /**
  * @typedef {Object} RankByPreferenceArgs
- * @property {Array<{ id: string, title: string, venue: { name: string, city: string }, startsAt: string, subcategories?: string[] }>} candidates
- * @property {Array<{ title: string, venue: { name: string, city: string }, subcategories?: string[] }>} liked
- * @property {Array<{ title: string, venue: { name: string, city: string }, subcategories?: string[] }>} disliked
+ * @property {Array<{ id: string, title: string, venue: { name: string, city: string }, startsAt: string }>} candidates
+ * @property {Array<{ title: string, venue: { name: string, city: string } }>} liked
+ * @property {Array<{ title: string, venue: { name: string, city: string } }>} disliked
  * @property {string} [derivedTraits]
  * @property {string} [guidance]
  */

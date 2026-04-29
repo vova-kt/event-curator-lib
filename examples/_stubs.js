@@ -34,7 +34,6 @@ export function stubLLM() {
                 description: 'Mixed bill of local stand-ups',
                 startsAt: '2026-05-02T20:00:00+02:00',
                 venue: { name: 'Comedy Café', city: 'Berlin', country: 'DE' },
-                subcategories: ['stand-up', 'showcase'],
                 price: { currency: 'EUR', min: 8, max: 12 },
               },
               {
@@ -42,7 +41,6 @@ export function stubLLM() {
                 description: 'Anti-folk and stand-up hybrid',
                 startsAt: '2026-05-03T21:00:00+02:00',
                 venue: { name: 'Roter Salon', city: 'Berlin', country: 'DE' },
-                subcategories: ['alt-comedy'],
                 price: { currency: 'EUR', min: 18 },
               },
             ],

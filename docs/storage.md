@@ -33,7 +33,6 @@ Logical tables (mapped to object stores in IndexedDB):
 | `venue_json`  | TEXT     | JSON-encoded venue                         |
 | `source_json` | TEXT     | JSON-encoded source `{name, url}`          |
 | `price_json`  | TEXT     | nullable, JSON                             |
-| `subcategories_json` | TEXT | JSON array of strings                    |
 | `first_seen_at` | TEXT   | set on first insert                        |
 | `last_seen_at`  | TEXT   | bumped on every re-encounter               |
 

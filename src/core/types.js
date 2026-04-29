@@ -42,7 +42,6 @@
  * @property {string} startsAt           // ISO 8601
  * @property {string} [endsAt]           // ISO 8601
  * @property {Venue} venue
- * @property {string[]} [subcategories]
  * @property {EventSource} source
  * @property {EventPrice} [price]
  * @property {string} [rationale]        // LLM's "why this matches" line
@@ -118,7 +117,6 @@
  * @property {string} title
  * @property {{ name: string, city: string }} venue
  * @property {string} startsAt
- * @property {string[]} [subcategories]
  */
 
 /**

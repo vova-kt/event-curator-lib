@@ -157,7 +157,6 @@ async function extractFromBatch(batch, ctx, timeframe) {
       startsAt: r.startsAt,
       endsAt: r.endsAt,
       venue: r.venue,
-      subcategories: r.subcategories,
       source: { name: r.source.name, url: r.source.url, fetchedAt },
       price: r.price,
     });

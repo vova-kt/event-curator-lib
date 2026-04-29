@@ -65,7 +65,6 @@ export function extractEventsPrompt({ city, queryText, timeframe, pages }) {
       '    "startsAt": ISO 8601 datetime string,',
       '    "endsAt": ISO 8601 datetime string?,',
       '    "venue": { "name": string, "address": string?, "city": string, "country": string? },',
-      '    "subcategories": string[]?,',
       '    "source": { "name": string, "url": string },',
       '    "price": { "currency": string?, "min": number?, "max": number?, "free": boolean? }?',
       '  }',

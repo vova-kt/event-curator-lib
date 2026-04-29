@@ -77,7 +77,7 @@ async function buildQueries(ctx) {
   return [...seen.values()];
 }
 
-const TRACKING_PARAM_PREFIXES = ['utm_', ''];
+const TRACKING_PARAM_PREFIXES = ['utm_'];
 const TRACKING_PARAM_NAMES = new Set([
   'fbclid',
   'srsltid',

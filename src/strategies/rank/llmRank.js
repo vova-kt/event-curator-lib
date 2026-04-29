@@ -27,13 +27,12 @@ export const llmRank = async (events, ctx) => {
     title: e.title,
     venue: { name: e.venue.name, city: e.venue.city },
     startsAt: e.startsAt,
-    subcategories: e.subcategories,
   }));
 
   const prompt = rankByPreferencePrompt({
     candidates,
-    liked: liked.map((l) => ({ title: l.title, venue: l.venue, subcategories: l.subcategories })),
-    disliked: disliked.map((d) => ({ title: d.title, venue: d.venue, subcategories: d.subcategories })),
+    liked: liked.map((l) => ({ title: l.title, venue: l.venue })),
+    disliked: disliked.map((d) => ({ title: d.title, venue: d.venue })),
     derivedTraits,
     guidance,
   });

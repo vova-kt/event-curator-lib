@@ -31,7 +31,6 @@ export async function recordFeedback(picks, candidates, ctx) {
     title: e.title,
     venue: { name: e.venue.name, city: e.venue.city },
     startsAt: e.startsAt,
-    subcategories: e.subcategories,
   });
 
   /** @param {import('../core/types.js').Event | undefined} e */
@@ -95,8 +94,8 @@ function scopeFromQuery(q) {
  */
 async function deriveTraits(pref, ctx) {
   const prompt = derivePreferenceTraitsPrompt({
-    liked: pref.liked.map((l) => ({ title: l.title, venue: l.venue, startsAt: l.startsAt, subcategories: l.subcategories })),
-    disliked: pref.disliked.map((d) => ({ title: d.title, venue: d.venue, startsAt: d.startsAt, subcategories: d.subcategories })),
+    liked: pref.liked.map((l) => ({ title: l.title, venue: l.venue, startsAt: l.startsAt })),
+    disliked: pref.disliked.map((d) => ({ title: d.title, venue: d.venue, startsAt: d.startsAt })),
   });
   const resp = await ctx.llm.chat({
     system: prompt.system,

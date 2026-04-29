@@ -11,7 +11,6 @@ Preferences are how the curator gets better with use. The user marks events as l
  * @property {string} title
  * @property {{ name: string, city: string }} venue
  * @property {string} startsAt
- * @property {string[]} [subcategories]
  */
 
 /**

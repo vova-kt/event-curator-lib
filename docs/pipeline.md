@@ -66,7 +66,7 @@ When `llmRank` is the active strategy it acts as a combined filter + rank pass: 
 
 **In**: `{ liked: string[], disliked: string[] }`, last result set → **Out**: updated preference persisted to storage.
 
-Not part of `curate()` — invoked via `curator.recordFeedback()`. Pulls liked/disliked events from the last result set, extracts signals (venue, subcategories, time-of-day, price band), updates `Preference.likedEvents` / `dislikedEvents`, and optionally re-derives `Preference.derivedTraits` via LLM.
+Not part of `curate()` — invoked via `curator.recordFeedback()`. Pulls liked/disliked events from the last result set, extracts signals (venue, time-of-day, price band), updates `Preference.likedEvents` / `dislikedEvents`, and optionally re-derives `Preference.derivedTraits` via LLM.
 
 ## Orchestration
 
