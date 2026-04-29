@@ -27,6 +27,27 @@ test('rules: excludeKeywords drops matching events', async () => {
   assert.equal(out[0].title, 'Pro Comedy Show');
 });
 
+test('rules: excludeKeywords matches Russian morphological variants', async () => {
+  const events = [
+    makeEvent({ title: 'Большой концерт' }),
+    makeEvent({ title: 'Концерты под открытым небом', source: { name: 's', url: 'https://b.example.com' } }),
+    makeEvent({ title: 'На концерте было шумно', source: { name: 's', url: 'https://c.example.com' } }),
+    makeEvent({ title: 'Театральная постановка', source: { name: 's', url: 'https://d.example.com' } }),
+  ];
+  const out = await rules(events, ctx({ preference: { liked: [], disliked: [], explicitFilters: { excludeKeywords: ['концерт'] } } }));
+  assert.deepEqual(out.map((e) => e.title), ['Театральная постановка']);
+});
+
+test('rules: excludeKeywords matches English plural via stemming', async () => {
+  const events = [
+    makeEvent({ title: 'Comedy Show' }),
+    makeEvent({ title: 'Stand-up Shows tonight', source: { name: 's', url: 'https://b.example.com' } }),
+    makeEvent({ title: 'Quiet reading', source: { name: 's', url: 'https://c.example.com' } }),
+  ];
+  const out = await rules(events, ctx({ preference: { liked: [], disliked: [], explicitFilters: { excludeKeywords: ['show'] } } }));
+  assert.deepEqual(out.map((e) => e.title), ['Quiet reading']);
+});
+
 test('rules: query filters override preference filters', async () => {
   const events = [
     makeEvent({ title: 'Cheap show', price: { currency: 'EUR', min: 5 }, source: { name: 's', url: 'https://a.example.com' } }),

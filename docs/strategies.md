@@ -39,6 +39,8 @@ Cross-session dedupe: the dedupe stage also consults `ctx.storage.getSeenIds()` 
 Live in `src/strategies/filter/`.
 
 - **`rules`** — applies `Preference.explicitFilters` (`excludeKeywords`, `excludeVenues`, price bounds). Pure, no LLM.
+  - Keyword matching is morphology-aware via [Snowball](http://snowball.tartarus.org/) stemming: title and description are tokenized on Unicode letters and each token is stemmed (Cyrillic → `russian`, otherwise → `english`); keywords are stemmed the same way and matched as space-bounded substrings of the stemmed haystack. So `excludeKeywords: ['концерт']` drops `'концерта'` / `'концертов'` / `'на концерте'`, and `['show']` drops `'shows'` / `'showing'`. Multi-word keywords (e.g. `'open mic'`) match contiguously after stemming.
+  - Venue matching stays exact (post-`normalize`) — proper nouns shouldn't be stemmed.
 - **`preferenceLLM`** — sends the candidate list plus the user's liked/disliked examples and `derivedTraits` to the LLM with the `filterByPreference` prompt; drops events the LLM judges off-target.
 
 Order matters: cheap rule-based filters first, LLM-based last (so the LLM only sees a smaller set).
