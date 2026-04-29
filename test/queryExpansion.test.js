@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { templates, llmExpand } from '../src/strategies/queryExpansion/index.js';
 import { memory } from '../src/adapters/storage/memory.js';
-import { stubLLM } from './_helpers.js';
+import { stubLLM, silentLogger } from './_helpers.js';
 import { DEFAULTS, mergeConfig } from '../src/core/config.js';
 
 /**
@@ -23,6 +23,7 @@ function makeCtx({ llm, storage, config, query }) {
       ...query,
     },
     preference: { liked: [], disliked: [], explicitFilters: {} },
+    logger: silentLogger,
   });
 }
 
@@ -98,18 +99,13 @@ test('llmExpand: in prod mode falls back to templates and warns', async () => {
   const storage = memory();
   await storage.init();
   const ctx = makeCtx({ llm, storage });
-
-  const originalWarn = console.warn;
   let warned = false;
-  console.warn = () => { warned = true; };
-  try {
-    const out = await llmExpand()(ctx);
-    assert.equal(out.length, 4); // templates produces 4
-    assert.ok(out.every((q) => q.includes('Berlin')));
-    assert.ok(warned);
-  } finally {
-    console.warn = originalWarn;
-  }
+  ctx.logger = { error: () => {}, warn: () => { warned = true; }, info: () => {}, debug: () => {} };
+
+  const out = await llmExpand()(ctx);
+  assert.equal(out.length, 4); // templates produces 4
+  assert.ok(out.every((q) => q.includes('Berlin')));
+  assert.ok(warned);
 });
 
 test('llmExpand: malformed LLM response (no queries field) treated as failure', async () => {

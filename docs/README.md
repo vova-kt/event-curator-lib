@@ -9,6 +9,6 @@ Concept-by-concept reference. Read the page that matches your task before editin
 - [storage.md](storage.md) — schema, backends
 - [prompts.md](prompts.md) — prompt files, shape, conventions
 - [preferences.md](preferences.md) — preference shape, scoping, capture, clearing
-- [config.md](config.md) — defaults, overrides, env vars
 - [examples.md](examples.md) — running the script and CLI
+- [env.md](env.md) — env-var bindings for API keys and DB path
 - [contributing.md](contributing.md) — rules and workflow

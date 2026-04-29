@@ -55,8 +55,7 @@ export function llmExpand({ limit } = {}) {
       return sliced;
     } catch (err) {
       if (ctx.config.dev) throw err;
-      // eslint-disable-next-line no-console
-      console.warn('[llmExpand] LLM failed, falling back to templates:', err instanceof Error ? err.message : err);
+      ctx.logger.warn('[llmExpand] LLM failed, falling back to templates:', err instanceof Error ? err.message : err);
       return await templates()(ctx);
     }
   };

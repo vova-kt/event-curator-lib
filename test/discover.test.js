@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { discover } from '../src/stages/discover.js';
 import { DEFAULTS, mergeConfig } from '../src/core/config.js';
 import { memory } from '../src/adapters/storage/memory.js';
+import { silentLogger } from './_helpers.js';
 
 /**
  * Build a minimal Ctx for the discover stage.
@@ -21,6 +22,7 @@ function makeCtx({ queryExpansion, search }) {
       timeframe: { from: '2026-05-01', to: '2026-05-15' },
     },
     preference: { liked: [], disliked: [], explicitFilters: {} },
+    logger: silentLogger,
   });
 }
 
@@ -134,13 +136,7 @@ test('discover: a failing expansion strategy is skipped, others continue', async
   const failing = () => { throw new Error('strategy failed'); };
   const ok = () => ['working query'];
 
-  const originalWarn = console.warn;
-  console.warn = () => {};
-  try {
-    await discover(makeCtx({ queryExpansion: [failing, ok], search: [search] }));
-  } finally {
-    console.warn = originalWarn;
-  }
+  await discover(makeCtx({ queryExpansion: [failing, ok], search: [search] }));
 
   assert.deepEqual(seen, ['working query']);
 });

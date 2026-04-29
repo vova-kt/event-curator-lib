@@ -2,6 +2,8 @@
 
 Two runnable entry points under `examples/`. Both wire up the curator with default adapters and read keys from env.
 
+Env-var bindings (API keys, DB path) are documented in [env.md](env.md). Runtime tunables live in [src/core/config.js](../src/core/config.js).
+
 ## Setup
 
 ```bash

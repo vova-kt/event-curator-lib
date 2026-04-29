@@ -1,40 +1,98 @@
 /**
- * Defaults and merge logic. See docs/config.md.
+ * Source of truth for all tunable runtime constants.
+ *
+ * Adapters and stages read from `ctx.config`, never from env vars directly.
+ * Env vars are read only at entry points (examples, adapter factories).
+ *
+ * Override flow: `createCurator({ config })` → `mergeConfig(DEFAULTS, override)`
+ * → result is deep-frozen and stored as `ctx.config`. Nothing in the pipeline
+ * mutates it.
+ *
+ * Adding a key: add it here with a default value and a comment that explains
+ * what it controls. Reference it from code as `ctx.config.<section>.<key>`.
+ * Docs pages must NOT duplicate the values below — they link here instead.
+ *
+ * Env-var bindings (entry-point concern, not core) are documented in
+ * [docs/env.md](../../docs/env.md).
  */
 
 /** @type {import('./types.js').Config} */
 export const DEFAULTS = Object.freeze({
+  /**
+   * Global "be loud about errors" switch. When true, strategies that have a
+   * graceful fallback (currently `llmExpand`) re-throw the underlying error
+   * instead of warning-and-falling-back. Production runs leave this false.
+   */
   dev: false,
+
+  /**
+   * Defaults for LLM adapter calls. The adapter is pluggable; these are the
+   * values handed to whichever adapter is wired in unless the caller overrides
+   * them per-call. Prompts under `src/prompts/` must work across all supported
+   * model families — see [docs/prompts_guide.md](../../docs/prompts_guide.md).
+   */
   llm: {
+    /** Default model id passed to the adapter (e.g. an OpenAI / Anthropic model id). */
     model: 'gpt-5.5-mini',
+    /** Sampling temperature. Low by default — prompts return JSON. */
     temperature: 0.2,
+    /** Max output tokens per call. Sized for the largest extract batches. */
     maxTokens: 16000,
   },
+
+  /** Defaults applied to every configured search adapter. */
   search: {
+    /** Per-adapter cap on hits returned per query. */
     maxResultsPerAdapter: 20,
+    /** Per-call timeout. Adapters abort the underlying request after this. */
     timeoutMs: 15_000,
   },
+
+  /** Pipeline-stage tuning. See [docs/pipeline.md](../../docs/pipeline.md). */
   pipeline: {
+    /** Number of curated events returned when the caller doesn't set `Query.limit`. */
     defaultLimit: 20,
+    /** Look-ahead window (days) used when the caller asks for "upcoming" events without an explicit timeframe. */
     defaultRollingDays: 90,
+    /** Worker-pool size for the extract stage's parallel LLM calls. */
     extractConcurrency: 4,
+    /** Max estimated input tokens per extract LLM call. Hits are batched up to this cap. */
     extractBatchTokenCap: 10_000,
+    /** Token estimator: tokens ≈ ceil(chars / charsPerToken). */
     charsPerToken: 4,
   },
+
+  /** Tuning for the `llmExpand` query-expansion strategy. */
   queryExpansion: {
+    /** Max queries `llmExpand` returns when no per-call limit is given. */
     defaultLimit: 8,
   },
+
+  /** Tuning for dedupe strategies. */
   dedupe: {
+    /** Similarity threshold above which two titles are treated as duplicates by `fuzzyTitle`. */
     fuzzyTitleThreshold: 0.85,
   },
+
+  /** Preference / feedback behavior. See [docs/preferences.md](../../docs/preferences.md). */
   preferences: {
+    /** Whether to maintain LLM-derived trait summaries from likes/dislikes. */
     deriveTraits: true,
+    /** Re-derive `derivedTraits` after this many new liked/disliked events. */
     traitsRefreshThreshold: 5,
+  },
+
+  /** Core logger configuration. */
+  logging: {
+    /** Log level: 'silent' | 'error' | 'warn' | 'info' | 'debug'. */
+    level: /** @type {'warn'} */ ('warn'),
   },
 });
 
 /**
  * Deep-merge plain objects. Arrays and primitives are replaced, not merged.
+ * Returns a deep-frozen copy — callers cannot mutate the result.
+ *
  * @template T
  * @param {T} base
  * @param {Partial<T> | undefined} override

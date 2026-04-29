@@ -2,6 +2,8 @@
 
 Preferences are how the curator gets better with use. The user marks events as liked or disliked; the curator uses those signals to filter and rank future searches.
 
+The `config.preferences.*` tunables referenced below (`deriveTraits`, `traitsRefreshThreshold`) are defined with their defaults in [src/core/config.js](../src/core/config.js).
+
 ## Shape
 
 ```js

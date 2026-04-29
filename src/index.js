@@ -3,6 +3,7 @@
  */
 
 import { DEFAULTS, mergeConfig } from './core/config.js';
+import { createLogger } from './core/logger.js';
 import { runCuration } from './core/pipeline.js';
 import { recordFeedback } from './stages/feedback.js';
 import { byId, fuzzyTitle } from './strategies/dedupe/index.js';
@@ -47,6 +48,7 @@ export { rules } from './strategies/filter/index.js';
  */
 export async function createCurator(opts) {
   const config = mergeConfig(DEFAULTS, opts.config);
+  const logger = createLogger(config.logging.level);
   const strategies = {
     queryExpansion: opts.strategies?.queryExpansion ?? [
       llmExpand({ limit: config.queryExpansion.defaultLimit }),
@@ -78,6 +80,7 @@ export async function createCurator(opts) {
         preference,
         onProgress: curateOpts?.onProgress,
         signal: curateOpts?.signal,
+        logger,
       };
       const events = await runCuration(ctx);
       lastResults = events;
@@ -102,6 +105,7 @@ export async function createCurator(opts) {
         config,
         query: lastQuery,
         preference,
+        logger,
       };
       await recordFeedback(picks, lastResults, ctx);
     },

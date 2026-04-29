@@ -35,6 +35,8 @@ export async function extract(hits, ctx) {
 
   const pages = preparePages(hits);
   const batches = batchPages(pages, batchTokenCap, charsPerToken);
+  const log = ctx.logger;
+  log.debug(`[extract] ${hits.length} hits → ${pages.length} pages → ${batches.length} batches (concurrency=${concurrency}, batchTokenCap=${batchTokenCap})`);
 
   /** @type {import('../core/types.js').Event[]} */
   const out = [];
@@ -51,10 +53,10 @@ export async function extract(hits, ctx) {
       const batch = batches[i];
       try {
         const events = await extractFromBatch(batch, ctx, timeframe);
+        log.debug(`[extract] batch ${i + 1}/${batches.length} (${batch.length} pages) → ${events.length} events`);
         out.push(...events);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn(
+        log.warn(
           `[extract] batch failed (${batch.length} pages):`,
           err instanceof Error ? err.message : err,
         );

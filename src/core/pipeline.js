@@ -15,24 +15,35 @@ import { ProgressStage, ProgressPhase } from './progress.js';
  */
 export async function runCuration(ctx) {
   const emit = ctx.onProgress ?? (() => {});
+  const log = ctx.logger;
+
+  log.info(`[pipeline] start city="${ctx.query.city}" query="${ctx.query.queryText}"`);
+  log.debug('[pipeline] query', ctx.query);
 
   const hits = await discover(ctx);
+  log.info(`[pipeline] discover → ${hits.length} hits`);
 
   emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.START, total: hits.length });
   let events = await extract(hits, ctx);
   emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.DONE, count: events.length });
+  log.info(`[pipeline] extract → ${events.length} events`);
 
   emit({ stage: ProgressStage.DEDUPE, phase: ProgressPhase.START, total: events.length });
+  const beforeDedupe = events.length;
   events = await dedupe(events, ctx);
   emit({ stage: ProgressStage.DEDUPE, phase: ProgressPhase.DONE, count: events.length });
+  log.info(`[pipeline] dedupe → ${events.length} events (dropped ${beforeDedupe - events.length})`);
 
   emit({ stage: ProgressStage.FILTER, phase: ProgressPhase.START, total: events.length });
+  const beforeFilter = events.length;
   events = await filter(events, ctx);
   emit({ stage: ProgressStage.FILTER, phase: ProgressPhase.DONE, count: events.length });
+  log.info(`[pipeline] filter → ${events.length} events (dropped ${beforeFilter - events.length})`);
 
   emit({ stage: ProgressStage.RANK, phase: ProgressPhase.START, total: events.length });
   events = await rank(events, ctx);
   emit({ stage: ProgressStage.RANK, phase: ProgressPhase.DONE, count: events.length });
+  log.info(`[pipeline] rank → ${events.length} events`);
 
   const limit = ctx.query.limit ?? ctx.config.pipeline.defaultLimit;
   events = events.slice(0, limit);
@@ -40,6 +51,8 @@ export async function runCuration(ctx) {
   emit({ stage: ProgressStage.PERSIST, phase: ProgressPhase.START });
   if (events.length > 0) await ctx.storage.upsertEvents(events);
   emit({ stage: ProgressStage.PERSIST, phase: ProgressPhase.DONE, count: events.length });
+  log.info(`[pipeline] persist → ${events.length} events (limit=${limit})`);
+  log.debug('[pipeline] result', events.map((e) => ({ id: e.id, title: e.title, startsAt: e.startsAt })));
 
   return events;
 }

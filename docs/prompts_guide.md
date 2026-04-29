@@ -1,6 +1,6 @@
 # Prompts authoring guide
 
-Authoring rules for every prompt under `src/prompts/`. The default model in [src/core/config.js](../src/core/config.js) is `gpt-5.5-mini`, but the LLM adapter is pluggable, so prompts must work well across:
+Authoring rules for every prompt under `src/prompts/`. The default model id lives in [src/core/config.js](../src/core/config.js) (`llm.model`) — read it there. The LLM adapter is pluggable, so prompts must work well across:
 
 - `openai-gpt-5.5-mini`
 - `openai-gpt-5.5`
@@ -113,7 +113,7 @@ These are tuning hints, not separate prompts. Write one prompt that works across
 
 - "Extraordinarily receptive to instructions" — terse, direct phrasing wins over elaborate justification.
 - Markdown headers also work, but XML tags work just as well and let one prompt serve both vendors. Stay on XML.
-- For `gpt-5.5-mini` (our default), keep `<rules>` short and concrete; the smaller model degrades faster than Opus on rule-heavy prompts.
+- For the smaller `gpt-5.5-mini` family, keep `<rules>` short and concrete; the smaller model degrades faster than Opus on rule-heavy prompts. (Whether this is the active default lives in [src/core/config.js](../src/core/config.js).)
 
 ## Checklist before merging a prompt change
 

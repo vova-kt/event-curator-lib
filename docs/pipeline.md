@@ -2,6 +2,8 @@
 
 The pipeline transforms a `Query` into curated `Event[]`. It is composed of stages, each a function of `(events, ctx) => Promise<events>`.
 
+Tunables referenced below (`pipeline.extractBatchTokenCap`, `pipeline.charsPerToken`, `pipeline.extractConcurrency`, `pipeline.defaultLimit`, etc.) are defined with their defaults and per-key documentation in [src/core/config.js](../src/core/config.js) — that file is the source of truth.
+
 ## Context
 
 Every stage receives a `ctx` object:
@@ -16,6 +18,7 @@ ctx = {
   query,         // current Query
   preference,    // current Preference, loaded once at pipeline start
   signal,        // optional AbortSignal
+  logger,        // levelled logger built from config.logging.level
 }
 ```
 
@@ -121,3 +124,7 @@ If you need a new stage (e.g., `enrich` for venue lookups), add it under `src/st
 - Adapter errors propagate. The pipeline does not silently swallow.
 - Strategy errors are caught per-strategy with a logged warning; the pipeline continues with the input it had. Rationale: a failing LLM-rank strategy shouldn't kill the whole curation; date-sort still gives a usable result.
 - Extract errors per-hit are isolated (a single broken page doesn't fail the run).
+
+## Logging
+
+Stages and strategies log via `ctx.logger`, a levelled logger built from `config.logging.level` (defined in [src/core/config.js](../src/core/config.js)). The orchestrator emits one `info` line per stage with the in/out counts; stages emit `debug` lines with per-strategy or per-batch detail; recoverable failures (adapter, strategy, extract batch) are emitted at `warn`. Set `config.logging.level` to `info` for stage-level visibility or `debug` for full pipeline tracing. The logger interface lives in [src/core/logger.js](../src/core/logger.js).

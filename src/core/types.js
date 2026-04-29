@@ -214,6 +214,7 @@
  * @property {{ defaultLimit: number }} queryExpansion
  * @property {{ fuzzyTitleThreshold: number }} dedupe
  * @property {{ deriveTraits: boolean, traitsRefreshThreshold: number }} preferences
+ * @property {{ level: 'silent'|'error'|'warn'|'info'|'debug' }} logging
  */
 
 /**
@@ -251,6 +252,7 @@
  * @property {Preference} preference
  * @property {AbortSignal} [signal]
  * @property {ProgressListener} [onProgress]
+ * @property {import('./logger.js').Logger} logger
  */
 
 export {};

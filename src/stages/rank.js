@@ -8,13 +8,15 @@
  * @returns {Promise<import('../core/types.js').Event[]>}
  */
 export async function rank(events, ctx) {
+  const log = ctx.logger;
   let current = events;
   for (const strategy of ctx.strategies.rank) {
+    const before = current.length;
     try {
       current = await strategy(current, ctx);
+      log.debug(`[rank] ${strategy.name || 'strategy'}: ${before} → ${current.length}`);
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn(`[rank] strategy failed:`, err instanceof Error ? err.message : err);
+      log.warn(`[rank] strategy failed:`, err instanceof Error ? err.message : err);
     }
   }
   return current;

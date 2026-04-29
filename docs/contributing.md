@@ -35,7 +35,7 @@ The lib is pre-`1.0`. Rename, restructure, drop fields, change return shapes whe
 - **An adapter** → see [adapters.md](adapters.md).
 - **A strategy** → see [strategies.md](strategies.md).
 - **A prompt** → see [prompts.md](prompts.md).
-- **A config key** → see [config.md](config.md).
+- **A config key** → add it to `DEFAULTS` in [src/core/config.js](../src/core/config.js) with an inline comment explaining what it controls; read it via `ctx.config.<section>.<key>`. If it controls a stage's behavior, mention it in [pipeline.md](pipeline.md).
 - **A storage column** → see [storage.md](storage.md). Edit the schema in place across all three adapters and reset local databases — no migrations.
 
 ## Tests

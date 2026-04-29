@@ -3,6 +3,10 @@
  */
 
 import { eventId } from '../src/core/identity.js';
+import { createLogger } from '../src/core/logger.js';
+
+/** Silent logger for tests that build their own ctx. */
+export const silentLogger = createLogger('silent');
 
 /**
  * @param {Partial<import('../src/core/types.js').Event>} overrides

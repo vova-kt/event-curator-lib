@@ -26,8 +26,8 @@ The `docs/` directory is the canonical reference. Read the page that matches you
 - [docs/prompts.md](docs/prompts.md) — where prompts live, the `({...args}) => {system, user}` shape, how to add one
 - [docs/prompts_guide.md](docs/prompts_guide.md) — authoring rules: XML-tagged section order, long-input exception, model-specific notes
 - [docs/preferences.md](docs/preferences.md) — preference shape, like/dislike capture, scoped clearing
-- [docs/config.md](docs/config.md) — defaults, override merge order, env-var bindings
 - [docs/examples.md](docs/examples.md) — running the script and CLI examples
+- [docs/env.md](docs/env.md) — env-var bindings for API keys and DB path
 - [docs/contributing.md](docs/contributing.md) — the three rules above, restated for humans, plus dev workflow
 
 ## Quick orientation
@@ -35,7 +35,8 @@ The `docs/` directory is the canonical reference. Read the page that matches you
 - **Public entry**: [src/index.js](src/index.js) — `createCurator({ llm, search, storage, strategies, config })`
 - **Pipeline**: [src/core/pipeline.js](src/core/pipeline.js) calls stages in [src/stages/](src/stages/)
 - **Types**: [src/core/types.js](src/core/types.js) — JSDoc typedefs only, no runtime
-- **Config**: [src/core/config.js](src/core/config.js)
+- **Config**: [src/core/config.js](src/core/config.js) — `DEFAULTS` is the canonical, self-documenting source of truth for every tunable; merge logic and override flow are documented inline.
+- **Logger**: [src/core/logger.js](src/core/logger.js) — levelled `ctx.logger` built from `config.logging.level`. Stages/strategies use it instead of `console.*`.
 - **Prompts**: [src/prompts/](src/prompts/) — one file per prompt, exports a function returning `{ system, user }`
 - **Storage schema**: defined inline in each adapter — see [src/adapters/storage/sqlite.js](src/adapters/storage/sqlite.js) and [src/adapters/storage/indexeddb.js](src/adapters/storage/indexeddb.js). Three logical tables (`events`, `preferences`, `kv`) plus `saved_queries` for user-defined searches keyed on `(city, queryText)`.
 - **Filter / rank**: only `rules` ships as a default filter strategy. The `llmRank` strategy in the rank stage is a *combined* filter + rank LLM pass — it omits poor matches and attaches a ~5-word rationale. Don't reintroduce a separate LLM filter stage.

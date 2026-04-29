@@ -12,10 +12,12 @@ import { ProgressStage, ProgressPhase } from '../core/progress.js';
  */
 export async function discover(ctx) {
   const emit = ctx.onProgress ?? (() => {});
+  const log = ctx.logger;
 
   emit({ stage: ProgressStage.QUERIES, phase: ProgressPhase.START });
   const queries = await buildQueries(ctx);
   emit({ stage: ProgressStage.QUERIES, phase: ProgressPhase.DONE, count: queries.length });
+  log.debug('[discover] queries', queries);
 
   const total = ctx.search.length * queries.length;
   emit({ stage: ProgressStage.SEARCH, phase: ProgressPhase.START, total });
@@ -33,8 +35,7 @@ export async function discover(ctx) {
           });
         } catch (err) {
           // One adapter or query failing should not kill discovery.
-          // eslint-disable-next-line no-console
-          console.warn(`[discover] ${adapter.name} failed for "${q}":`, err instanceof Error ? err.message : err);
+          log.warn(`[discover] ${adapter.name} failed for "${q}":`, err instanceof Error ? err.message : err);
           return [];
         } finally {
           current++;
@@ -46,6 +47,7 @@ export async function discover(ctx) {
   const all = (await Promise.all(tasks)).flat();
   const deduped = dedupeByUrl(all);
   emit({ stage: ProgressStage.SEARCH, phase: ProgressPhase.DONE, count: deduped.length });
+  log.debug(`[discover] ${all.length} raw hits → ${deduped.length} after url-dedupe`);
   return deduped;
 }
 
@@ -64,8 +66,7 @@ async function buildQueries(ctx) {
   for (const r of settled) {
     if (r.status === 'rejected') {
       // Mirrors the per-adapter error policy: a single strategy failure should not kill discovery.
-      // eslint-disable-next-line no-console
-      console.warn('[discover] queryExpansion strategy failed:', r.reason instanceof Error ? r.reason.message : r.reason);
+      ctx.logger.warn('[discover] queryExpansion strategy failed:', r.reason instanceof Error ? r.reason.message : r.reason);
       continue;
     }
     for (const q of r.value ?? []) {
