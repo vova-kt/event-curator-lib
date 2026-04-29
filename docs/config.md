@@ -20,6 +20,8 @@ export const DEFAULTS = Object.freeze({
     defaultLimit: 10,
     defaultRollingDays: 14,
     extractConcurrency: 4,
+    extractBatchTokenCap: 10_000,  // max estimated input tokens per extract LLM call (batches multiple hits)
+    charsPerToken: 4,              // estimator: tokens ≈ ceil(chars / charsPerToken)
   },
   queryExpansion: {
     defaultLimit: 8,             // max queries `llmExpand` returns when no per-call limit is given

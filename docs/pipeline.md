@@ -27,7 +27,7 @@ Stages are pure with respect to `ctx` (they don't mutate it). They may emit even
 
 **In**: `ctx.query` → **Out**: `SearchHit[]` (treated as `events` with stub fields)
 
-Composes search queries by running every strategy in `ctx.strategies.queryExpansion` (see [strategies.md](strategies.md)) **concurrently** (`Promise.allSettled`), lower-cases + trims for case-insensitive dedup, then fans the union out across `ctx.search` adapters **in parallel** — every `(adapter, query)` pair is dispatched at once via `Promise.all`. Returns deduplicated `SearchHit { url, title, snippet, source }`. Progress ticks fire as each call settles, so `current` reflects completions, not dispatch order.
+Composes search queries by running every strategy in `ctx.strategies.queryExpansion` (see [strategies.md](strategies.md)) **concurrently** (`Promise.allSettled`), lower-cases + trims for case-insensitive dedup, then fans the union out across `ctx.search` adapters **in parallel** — every `(adapter, query)` pair is dispatched at once via `Promise.all`. Returns deduplicated `SearchHit { url, title, snippet, source }`. Hit dedup keys on a canonical form of the URL — lowercased scheme+host, `www.` stripped, fragment removed, tracking params (`utm_*`, `fbclid`, `gclid`, `mc_cid`, `ref`, etc.) dropped, trailing slash trimmed — so adapters returning the same page with different tracking suffixes collapse to one hit. Progress ticks fire as each call settles, so `current` reflects completions, not dispatch order.
 
 Errors:
 - A single failing query-expansion strategy is warned about and skipped (the rejected entry is filtered out of the `allSettled` results).
@@ -38,7 +38,7 @@ Errors:
 
 **In**: `SearchHit[]` → **Out**: `Event[]`
 
-For each hit, fetch page content (or use the snippet if rich enough), pass through the LLM with the `extractEvents` prompt, parse the structured response into `Event`s. Drops hits that don't yield valid events.
+Hits are grouped into batches whose combined estimated input tokens stay within `pipeline.extractBatchTokenCap` (tokens estimated as `ceil(chars / pipeline.charsPerToken)`). Each batch is sent in a single `extractEvents` LLM call. Each page in the batch is labelled with a 1-based `PAGE_INDEX` and its `SOURCE_URL`; the LLM returns events tagged with both. Mapping events back to hits uses `pageIndex` as the primary key, with `sourceUrl` as a cross-check — if they disagree, the URL match wins (multiple events from the same page just share the same `pageIndex`). As a fallback, single-page batches attribute untagged events to the sole page. Events that match no page are dropped. Batches run through a worker pool sized by `pipeline.extractConcurrency`; a single batch failure is logged and isolated. Progress ticks are emitted per hit (a batch advances `current` by its hit count when it settles), so the original `total: hits.length` contract is preserved.
 
 ### 3. dedupe (`src/stages/dedupe.js`)
 

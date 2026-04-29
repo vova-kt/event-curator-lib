@@ -50,6 +50,77 @@ test('discover: throws when queryExpansion is empty (misconfiguration)', async (
   );
 });
 
+test('discover: collapses hits whose URLs differ only by tracking params, www, casing, fragment, or trailing slash', async () => {
+  const variants = [
+    'https://example.com/event/42',
+    'https://www.example.com/event/42',
+    'https://EXAMPLE.com/event/42/',
+    'https://example.com/event/42#tickets',
+    'https://example.com/event/42?utm_source=newsletter&utm_campaign=spring',
+    'https://example.com/event/42?fbclid=abc&gclid=xyz&ref=twitter',
+    'http://example.com/event/42', // distinct (different scheme)
+    'https://example.com/event/42?id=7', // distinct (non-tracking param)
+  ];
+  const search = {
+    name: 'spy',
+    async search() {
+      return variants.map((url, i) => ({ url, title: `t${i}`, snippet: '', source: 'spy' }));
+    },
+  };
+  const hits = await discover(makeCtx({
+    queryExpansion: [() => ['q']],
+    search: [search],
+  }));
+
+  const urls = hits.map((h) => h.url).sort();
+  // First-seen wins for the canonical group; the other two stand alone.
+  assert.deepEqual(urls, [
+    'http://example.com/event/42',
+    'https://example.com/event/42',
+    'https://example.com/event/42?id=7',
+  ]);
+});
+
+test('discover: preserves non-tracking query params and keeps the first-seen variant', async () => {
+  const search = {
+    name: 'spy',
+    async search() {
+      return [
+        { url: 'https://example.com/e?id=1&utm_medium=email', title: 'first', snippet: '', source: 'spy' },
+        { url: 'https://example.com/e?id=1', title: 'second', snippet: '', source: 'spy' },
+        { url: 'https://example.com/e?id=2', title: 'third', snippet: '', source: 'spy' },
+      ];
+    },
+  };
+  const hits = await discover(makeCtx({
+    queryExpansion: [() => ['q']],
+    search: [search],
+  }));
+
+  assert.equal(hits.length, 2);
+  assert.equal(hits[0].title, 'first'); // first-seen variant wins for the canonical group
+  assert.equal(hits[1].title, 'third');
+});
+
+test('discover: unparseable URLs fall back to exact-match dedup', async () => {
+  const search = {
+    name: 'spy',
+    async search() {
+      return [
+        { url: 'not a url', title: 'a', snippet: '', source: 'spy' },
+        { url: 'not a url', title: 'b', snippet: '', source: 'spy' },
+        { url: 'also not a url', title: 'c', snippet: '', source: 'spy' },
+      ];
+    },
+  };
+  const hits = await discover(makeCtx({
+    queryExpansion: [() => ['q']],
+    search: [search],
+  }));
+
+  assert.deepEqual(hits.map((h) => h.title).sort(), ['a', 'c']);
+});
+
 test('discover: a failing expansion strategy is skipped, others continue', async () => {
   /** @type {string[]} */
   const seen = [];

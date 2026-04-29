@@ -1,13 +1,22 @@
 /**
  * Extract stage: turn SearchHits into structured Events via the LLM.
- * Per-hit failures are isolated so one broken page doesn't fail the run.
+ *
+ * Hits are grouped into batches whose combined estimated input tokens
+ * stay within `pipeline.extractBatchTokenCap`. Tokens are estimated as
+ * ceil(chars / pipeline.charsPerToken). Each batch is one LLM call.
+ *
+ * Per-batch failures are isolated so one broken request doesn't fail the run.
  * See docs/pipeline.md.
  */
 
-import { extractEventsPrompt } from '../prompts/extractEvents.js';
+import { extractEventsPrompt } from '../prompts/index.js';
 import { eventId } from '../core/identity.js';
 import { resolveTimeframe } from '../core/timeframe.js';
 import { ProgressStage, ProgressPhase } from '../core/progress.js';
+
+/**
+ * @typedef {{ hit: import('../core/types.js').SearchHit, pageText: string }} PreparedPage
+ */
 
 /**
  * @param {import('../core/types.js').SearchHit[]} hits
@@ -17,51 +26,125 @@ import { ProgressStage, ProgressPhase } from '../core/progress.js';
 export async function extract(hits, ctx) {
   const timeframe = resolveTimeframe(ctx.query.timeframe, ctx.config.pipeline.defaultRollingDays);
   const concurrency = ctx.config.pipeline.extractConcurrency;
+  const batchTokenCap = ctx.config.pipeline.extractBatchTokenCap;
+  const charsPerToken = ctx.config.pipeline.charsPerToken;
   const emit = ctx.onProgress ?? (() => {});
+
+  const pages = preparePages(hits);
+  const batches = batchPages(pages, batchTokenCap, charsPerToken);
 
   /** @type {import('../core/types.js').Event[]} */
   const out = [];
   let cursor = 0;
-  let processed = 0;
+  let processed = hits.length - pages.length;
+  if (processed > 0) {
+    emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.TICK, current: processed, total: hits.length });
+  }
 
   /** @returns {Promise<void>} */
   async function worker() {
-    while (cursor < hits.length) {
+    while (cursor < batches.length) {
       const i = cursor++;
-      const hit = hits[i];
+      const batch = batches[i];
       try {
-        const events = await extractFromHit(hit, ctx, timeframe);
+        const events = await extractFromBatch(batch, ctx, timeframe);
         out.push(...events);
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.warn(`[extract] failed for ${hit.url}:`, err instanceof Error ? err.message : err);
+        console.warn(
+          `[extract] batch failed (${batch.length} pages):`,
+          err instanceof Error ? err.message : err,
+        );
       }
-      processed++;
+      processed += batch.length;
       emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.TICK, current: processed, total: hits.length });
     }
   }
 
-  const workers = Array.from({ length: Math.min(concurrency, hits.length) }, worker);
+  const workers = Array.from({ length: Math.min(concurrency, batches.length) }, worker);
   await Promise.all(workers);
   return out;
 }
 
 /**
- * @param {import('../core/types.js').SearchHit} hit
+ * @param {import('../core/types.js').SearchHit[]} hits
+ * @returns {PreparedPage[]}
+ */
+function preparePages(hits) {
+  /** @type {PreparedPage[]} */
+  const out = [];
+  for (const hit of hits) {
+    const text = hit.snippet ?? hit.content ?? '';
+    if (!text.trim()) continue;
+    out.push({ hit, pageText: text });
+  }
+  return out;
+}
+
+/**
+ * Greedy bin-packing: append pages to the current batch until adding another
+ * would exceed the token cap, then start a new batch. A single oversized page
+ * lands alone in its own batch.
+ *
+ * @param {PreparedPage[]} pages
+ * @param {number} batchTokenCap
+ * @param {number} charsPerToken
+ * @returns {PreparedPage[][]}
+ */
+function batchPages(pages, batchTokenCap, charsPerToken) {
+  /** @type {PreparedPage[][]} */
+  const batches = [];
+  /** @type {PreparedPage[]} */
+  let current = [];
+  let currentTokens = 0;
+  for (const page of pages) {
+    const tokens = Math.ceil(page.pageText.length / charsPerToken);
+    if (current.length > 0 && currentTokens + tokens > batchTokenCap) {
+      batches.push(current);
+      current = [];
+      currentTokens = 0;
+    }
+    current.push(page);
+    currentTokens += tokens;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+/**
+ * Resolve which page in the batch an LLM-returned event came from.
+ *
+ * Primary key: 1-based `pageIndex`. Cross-check: `sourceUrl` must agree with
+ * the indexed page's URL when both are present. If they disagree, fall back
+ * to URL lookup (the LLM likely got one field right and the other wrong).
+ * As a last resort, single-page batches attribute untagged events to the
+ * sole page.
+ *
+ * @param {{ pageIndex?: number, sourceUrl?: string }} r
+ * @param {PreparedPage[]} batch
+ * @param {Map<string, PreparedPage>} byUrl
+ * @returns {PreparedPage | undefined}
+ */
+function matchPage(r, batch, byUrl) {
+  const idx = Number.isInteger(r.pageIndex) ? /** @type {number} */ (r.pageIndex) - 1 : -1;
+  const byIndex = idx >= 0 && idx < batch.length ? batch[idx] : undefined;
+  const byUrlMatch = r.sourceUrl ? byUrl.get(r.sourceUrl) : undefined;
+  if (byIndex && byUrlMatch) return byIndex === byUrlMatch ? byIndex : byUrlMatch;
+  return byIndex ?? byUrlMatch ?? (batch.length === 1 ? batch[0] : undefined);
+}
+
+/**
+ * @param {PreparedPage[]} batch
  * @param {import('../core/types.js').Ctx} ctx
  * @param {{ from: string, to: string }} timeframe
  * @returns {Promise<import('../core/types.js').Event[]>}
  */
-async function extractFromHit(hit, ctx, timeframe) {
-  const pageText = hit.content ?? hit.snippet ?? '';
-  if (!pageText.trim()) return [];
-
+async function extractFromBatch(batch, ctx, timeframe) {
   const prompt = extractEventsPrompt({
     city: ctx.query.city,
     category: String(ctx.query.category),
     timeframe,
-    pageText,
-    sourceUrl: hit.url,
+    pages: batch.map(({ hit, pageText }) => ({ sourceUrl: hit.url, pageText })),
   });
 
   const resp = await ctx.llm.chat({
@@ -71,14 +154,19 @@ async function extractFromHit(hit, ctx, timeframe) {
     signal: ctx.signal,
   });
 
-  const json = /** @type {{ events?: Array<Partial<import('../core/types.js').Event>> }} */ (resp.json ?? {});
+  const json = /** @type {{ events?: Array<Partial<import('../core/types.js').Event> & { pageIndex?: number, sourceUrl?: string }> }} */ (
+    resp.json ?? {}
+  );
   const raws = Array.isArray(json.events) ? json.events : [];
   const fetchedAt = new Date().toISOString();
+  const byUrl = new Map(batch.map((p) => [p.hit.url, p]));
 
   /** @type {import('../core/types.js').Event[]} */
   const events = [];
   for (const r of raws) {
     if (!r.title || !r.startsAt || !r.venue?.name || !r.venue?.city) continue;
+    const matched = matchPage(r, batch, byUrl);
+    if (!matched) continue;
     events.push({
       id: eventId({ title: r.title, startsAt: r.startsAt, venue: r.venue }),
       title: r.title,
@@ -88,9 +176,9 @@ async function extractFromHit(hit, ctx, timeframe) {
       venue: r.venue,
       category: r.category ?? ctx.query.category,
       subcategories: r.subcategories,
-      source: { name: hit.source, url: hit.url, fetchedAt },
+      source: { name: matched.hit.source, url: matched.hit.url, fetchedAt },
       price: r.price,
-      raw: pageText.slice(0, 1000),
+      raw: matched.pageText.slice(0, 1000),
     });
   }
   return events;

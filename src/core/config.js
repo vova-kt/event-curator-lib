@@ -18,6 +18,8 @@ export const DEFAULTS = Object.freeze({
     defaultLimit: 10,
     defaultRollingDays: 14,
     extractConcurrency: 4,
+    extractBatchTokenCap: 10_000,
+    charsPerToken: 4,
   },
   queryExpansion: {
     defaultLimit: 8,

@@ -77,6 +77,55 @@ async function buildQueries(ctx) {
   return [...seen.values()];
 }
 
+const TRACKING_PARAM_PREFIXES = ['utm_', ''];
+const TRACKING_PARAM_NAMES = new Set([
+  'fbclid',
+  'srsltid',
+  'gclid',
+  'gbraid',
+  'wbraid',
+  'msclkid',
+  'mc_cid',
+  'mc_eid',
+  'yclid',
+  'igshid',
+  '_hsenc',
+  '_hsmi',
+  'ref',
+  'ref_src',
+  'ref_url',
+]);
+
+/**
+ * Canonicalize a URL so cosmetically-different links to the same page collapse:
+ * lowercase scheme+host, strip `www.`, drop fragment, drop tracking query params,
+ * remove trailing slash on the path. Returns the original string on parse failure
+ * so non-URL ids still dedupe by exact match.
+ * @param {string} url
+ * @returns {string}
+ */
+function canonicalizeUrl(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return url;
+  }
+  u.hash = '';
+  u.protocol = u.protocol.toLowerCase();
+  u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
+  for (const key of [...u.searchParams.keys()]) {
+    const lower = key.toLowerCase();
+    if (TRACKING_PARAM_NAMES.has(lower) || TRACKING_PARAM_PREFIXES.some((p) => lower.startsWith(p))) {
+      u.searchParams.delete(key);
+    }
+  }
+  if (u.pathname.length > 1 && u.pathname.endsWith('/')) {
+    u.pathname = u.pathname.replace(/\/+$/, '');
+  }
+  return u.toString();
+}
+
 /**
  * @param {import('../core/types.js').SearchHit[]} hits
  */
@@ -84,7 +133,8 @@ function dedupeByUrl(hits) {
   /** @type {Map<string, import('../core/types.js').SearchHit>} */
   const seen = new Map();
   for (const h of hits) {
-    if (!seen.has(h.url)) seen.set(h.url, h);
+    const key = canonicalizeUrl(h.url);
+    if (!seen.has(key)) seen.set(key, h);
   }
   return [...seen.values()];
 }
