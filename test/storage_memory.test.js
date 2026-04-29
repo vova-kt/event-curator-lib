@@ -3,14 +3,39 @@ import assert from 'node:assert/strict';
 import { memory } from '../src/adapters/storage/memory.js';
 import { makeEvent } from './_helpers.js';
 
-test('memory storage: upsertEvents + getSeenIds', async () => {
+test('memory storage: upsertEvents stores events but does not mark them shown', async () => {
   const s = memory();
   await s.init();
   const e1 = makeEvent({ title: 'A' });
   const e2 = makeEvent({ title: 'B' });
   await s.upsertEvents([e1, e2]);
-  const seen = await s.getSeenIds([e1.id, e2.id, 'evt_does_not_exist']);
-  assert.deepEqual([...seen].sort(), [e1.id, e2.id].sort());
+  // Both events round-trip from storage…
+  const fetched = await s.getEvents([e1.id, e2.id]);
+  assert.equal(fetched.length, 2);
+  // …but neither has been shown yet, so getShownIds returns empty.
+  const shown = await s.getShownIds([e1.id, e2.id, 'evt_does_not_exist']);
+  assert.equal(shown.size, 0);
+});
+
+test('memory storage: markShown + getShownIds + listShown per saved query', async () => {
+  const s = memory();
+  await s.init();
+  const e1 = makeEvent({ title: 'A' });
+  const e2 = makeEvent({ title: 'B' });
+  const e3 = makeEvent({ title: 'C' });
+  await s.upsertEvents([e1, e2, e3]);
+
+  await s.markShown([e1.id, e2.id], { city: 'Berlin', queryText: 'comedy' });
+  const shown = await s.getShownIds([e1.id, e2.id, e3.id]);
+  assert.deepEqual([...shown].sort(), [e1.id, e2.id].sort());
+
+  // listShown is per-(city, queryText), most-recent first.
+  const list = await s.listShown({ city: 'Berlin', queryText: 'comedy' });
+  assert.deepEqual(list.map((e) => e.id).sort(), [e1.id, e2.id].sort());
+
+  // A different saved query has no shown rows yet.
+  const empty = await s.listShown({ city: 'Berlin', queryText: 'jazz' });
+  assert.equal(empty.length, 0);
 });
 
 test('memory storage: preferences scope merge — scoped overrides global', async () => {

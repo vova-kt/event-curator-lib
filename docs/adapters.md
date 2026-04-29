@@ -78,7 +78,9 @@ Stages call `ctx.llm.chat({ system, messages, json: true })` with prompts loaded
  * @property {() => Promise<void>} close
  *
  * @property {(events: Event[]) => Promise<void>} upsertEvents
- * @property {(ids: string[]) => Promise<Set<string>>} getSeenIds
+ * @property {(ids: string[], ref: { city: string, queryText: string }) => Promise<void>} markShown
+ * @property {(ids: string[]) => Promise<Set<string>>} getShownIds
+ * @property {(ref: { city: string, queryText: string }, opts?: { limit?: number }) => Promise<Event[]>} listShown
  * @property {(ids: string[]) => Promise<Event[]>} getEvents
  *
  * @property {(scope?: { city?: string, queryText?: string }) => Promise<Preference>} getPreference

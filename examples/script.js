@@ -52,6 +52,10 @@ if (events.length === 0) {
     console.log(`[${i + 1}] ${date}  ${e.title}  —  ${e.venue.name}${price ? ` (${price})` : ''}`);
     if (e.rationale) console.log(`     ↳ ${e.rationale}`);
   }
+  // The script prints every returned event in one shot, so all of them count
+  // as "shown" — record that so cross-session dedupe (storage.getShownIds)
+  // suppresses them on the next run.
+  await curator.markShown(events.map((e) => e.id), { city: args.city, queryText: args.query });
 }
 
 await curator.close();

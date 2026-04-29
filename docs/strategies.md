@@ -57,7 +57,7 @@ Live in `src/strategies/dedupe/`.
 
 > **Why not key on `source.url`?** A listing page (one URL) often yields multiple distinct events. Keying dedupe on the source URL would collapse them. Always dedupe on content (`id`) or content-similarity (`fuzzyTitle`), never on the page where we found the listing.
 
-Cross-session dedupe: the dedupe stage also consults `ctx.storage.getSeenIds()` and drops events already present in the store. This is a stage-level concern, not a strategy.
+Cross-session dedupe: the dedupe stage also consults `ctx.storage.getShownIds()` and drops events the user has already been shown (recorded via `curator.markShown(...)`). Events that landed in storage but were never marked shown remain eligible to resurface. This is a stage-level concern, not a strategy.
 
 ## Filter strategies
 

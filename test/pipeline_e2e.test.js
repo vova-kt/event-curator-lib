@@ -47,7 +47,7 @@ test('createCurator: full pipeline returns events from stub adapters', async () 
   await curator.close();
 });
 
-test('createCurator: cross-session dedupe via storage', async () => {
+test('createCurator: cross-session dedupe only drops events the consumer marked shown', async () => {
   let calls = 0;
   const llm = stubLLM(() => {
     calls++;
@@ -73,14 +73,56 @@ test('createCurator: cross-session dedupe via storage', async () => {
   });
   assert.equal(first.events.length, 1);
 
-  const second = await curator.curate({
+  // Without an explicit markShown, the same event resurfaces — events that
+  // landed in storage but were never actually shown to the user remain
+  // eligible for re-discovery.
+  const secondNotShown = await curator.curate({
     city: 'Berlin',
     queryText: 'comedy',
     timeframe: { rolling: { days: 14 } },
   });
-  // Same event id: cross-session dedupe should drop it.
-  assert.equal(second.events.length, 0);
+  assert.equal(secondNotShown.events.length, 1);
+
+  // Once the consumer marks it shown, the cross-session dedupe drops it.
+  await curator.markShown([first.events[0].id], { city: 'Berlin', queryText: 'comedy' });
+  const third = await curator.curate({
+    city: 'Berlin',
+    queryText: 'comedy',
+    timeframe: { rolling: { days: 14 } },
+  });
+  assert.equal(third.events.length, 0);
   assert.ok(calls >= 2);
+
+  await curator.close();
+});
+
+test('createCurator: listShown returns previously shown events for a saved query', async () => {
+  const llm = stubLLM(() => ({
+    events: [
+      {
+        title: 'Listed',
+        startsAt: '2026-05-02T20:00:00+00:00',
+        venue: { name: 'V', city: 'Berlin' },
+        source: { name: 'stub', url: 'https://x.example.com' },
+      },
+    ],
+  }));
+  const search = stubSearch([{ url: 'https://x.example.com', title: 't', content: 'c', source: 'stub' }]);
+  const storage = memory();
+  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion });
+
+  const { events } = await curator.curate({
+    city: 'Berlin', queryText: 'comedy', timeframe: { rolling: { days: 14 } },
+  });
+  await curator.markShown(events.map((e) => e.id), { city: 'Berlin', queryText: 'comedy' });
+
+  const history = await curator.listShown({ city: 'Berlin', queryText: 'comedy' });
+  assert.equal(history.length, 1);
+  assert.equal(history[0].title, 'Listed');
+
+  // Nothing shown for a different saved query.
+  const empty = await curator.listShown({ city: 'Berlin', queryText: 'jazz' });
+  assert.equal(empty.length, 0);
 
   await curator.close();
 });

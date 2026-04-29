@@ -47,6 +47,7 @@
  * @property {string} [rationale]        // LLM's "why this matches" line
  * @property {string} [firstSeenAt]
  * @property {string} [lastSeenAt]
+ * @property {string} [lastShownAt]      // most recent time any consumer marked this event as actually shown to the user
  */
 
 /**
@@ -171,11 +172,24 @@
  */
 
 /**
+ * @typedef {Object} ShownRef
+ * @property {string} city
+ * @property {string} queryText
+ */
+
+/**
+ * @typedef {Object} ListShownOptions
+ * @property {number} [limit]    // cap rows returned; defaults to no cap
+ */
+
+/**
  * @typedef {Object} StorageAdapter
  * @property {() => Promise<void>} init
  * @property {() => Promise<void>} close
  * @property {(events: Event[]) => Promise<void>} upsertEvents
- * @property {(ids: string[]) => Promise<Set<string>>} getSeenIds
+ * @property {(ids: string[], ref: ShownRef) => Promise<void>} markShown
+ * @property {(ids: string[]) => Promise<Set<string>>} getShownIds
+ * @property {(ref: ShownRef, opts?: ListShownOptions) => Promise<Event[]>} listShown
  * @property {(ids: string[]) => Promise<Event[]>} getEvents
  * @property {(scope?: PreferenceScope) => Promise<Preference>} getPreference
  * @property {(updater: (current: Preference) => Preference, scope?: PreferenceScope) => Promise<Preference>} updatePreference

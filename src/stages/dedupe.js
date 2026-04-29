@@ -1,6 +1,6 @@
 /**
  * Dedupe stage: in-batch dedupe via configured strategies plus cross-session
- * dedupe via storage's `getSeenIds`. See docs/pipeline.md.
+ * dedupe via storage's `getShownIds`. See docs/pipeline.md.
  */
 
 /**
@@ -20,10 +20,12 @@ export async function dedupe(events, ctx) {
       log.warn(`[dedupe] strategy failed:`, err instanceof Error ? err.message : err);
     }
   }
-  // Cross-session: drop ids already curated.
-  const seen = await ctx.storage.getSeenIds(current.map((e) => e.id));
-  if (seen.size === 0) return current;
-  const out = current.filter((e) => !seen.has(e.id));
-  log.debug(`[dedupe] cross-session: dropped ${current.length - out.length} already-seen events`);
+  // Cross-session: drop ids that have already been shown to the user in any
+  // prior session (via storage.markShown). Events sitting in storage that were
+  // never actually shown remain eligible to surface again.
+  const shown = await ctx.storage.getShownIds(current.map((e) => e.id));
+  if (shown.size === 0) return current;
+  const out = current.filter((e) => !shown.has(e.id));
+  log.debug(`[dedupe] cross-session: dropped ${current.length - out.length} already-shown events`);
   return out;
 }

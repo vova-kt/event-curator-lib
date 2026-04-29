@@ -1,6 +1,6 @@
 # Storage
 
-Storage holds three things: **events** (so we can dedupe across sessions and recall what was shown), **preferences** (the user's accumulated likes/dislikes/filters), and a **generic kv** table for adapter-agnostic caches (e.g. query-expansion).
+Storage holds four things: **events** (the canonical record produced by curation, used for cross-session lookups and feedback resolution), an **event_views** junction tracking which events were actually shown to the user for which saved query, **preferences** (the user's accumulated likes/dislikes/filters), and a **generic kv** table for adapter-agnostic caches (e.g. query-expansion).
 
 The library is in active pre-`1.0` development — there is no migration system. The schema is defined once per adapter and applied idempotently on `init()`. When the schema needs to change, edit it in place and reset any local databases. Don't add migrations.
 
@@ -35,6 +35,23 @@ Logical tables (mapped to object stores in IndexedDB):
 | `price_json`  | TEXT     | nullable, JSON                             |
 | `first_seen_at` | TEXT   | set on first insert                        |
 | `last_seen_at`  | TEXT   | bumped on every re-encounter               |
+| `last_shown_at` | TEXT   | nullable; bumped when `markShown` records the event for any saved query — denormalized mirror of the most-recent `event_views.shown_at` for fast UI rendering |
+
+### `event_views`
+
+Per-saved-query junction recording which events the user has actually been shown. Distinct from the `events` table: `events` accumulates everything curation produces; `event_views` only contains rows the consumer explicitly persisted via `markShown(ids, { city, queryText })`. The dedupe stage filters cross-session by membership in this table, so events stored but not shown remain eligible to resurface.
+
+| column        | type    | notes                                                  |
+| ------------- | ------- | ------------------------------------------------------ |
+| `event_id`    | TEXT    | part of PK; FK-shaped pointer into `events.id`         |
+| `city`        | TEXT    | part of PK; saved-query city                           |
+| `query_text`  | TEXT    | part of PK; saved-query text                           |
+| `shown_at`    | TEXT    | bumped on every `markShown` call for this `(event, city, queryText)` |
+
+Adapter contract:
+- `markShown(ids: string[], { city, queryText })` — upsert one row per id; idempotent.
+- `getShownIds(ids: string[]) => Promise<Set<string>>` — returns the subset of `ids` with **any** view row across saved queries (used by global cross-session dedupe).
+- `listShown({ city, queryText }, { limit? }) => Promise<Event[]>` — joins `event_views` to `events`, filtered by `(city, queryText)`, ordered by `shown_at DESC`. Powers the TUI history view.
 
 ### `preferences`
 
@@ -91,7 +108,7 @@ Adapter contract:
 ## Schema definition
 
 - **SQLite** ([src/adapters/storage/sqlite.js](../src/adapters/storage/sqlite.js)) — a single `SCHEMA` constant of `CREATE TABLE IF NOT EXISTS …` statements, executed on every `init()`. Idempotent: re-opening an existing db is a no-op.
-- **IndexedDB** ([src/adapters/storage/indexeddb.js](../src/adapters/storage/indexeddb.js)) — DB version `1`. `onupgradeneeded` creates the four object stores (`events`, `preferences`, `kv`, `savedQueries`) if absent. Per pre-`1.0` rules: when stores change, clear the IndexedDB origin rather than bumping the version.
+- **IndexedDB** ([src/adapters/storage/indexeddb.js](../src/adapters/storage/indexeddb.js)) — `onupgradeneeded` creates the five object stores (`events`, `preferences`, `kv`, `savedQueries`, `eventViews`) if absent and adds the `eventViews` indexes (`eventId`, and the composite `cityQueryShown`). Per pre-`1.0` rules: when stores change, clear the IndexedDB origin rather than bumping the version.
 - **Memory** — Maps; nothing to create.
 
 When the schema needs to change during development, edit the constants in place and recreate local databases (delete the sqlite file, clear the IndexedDB origin). No migration history.

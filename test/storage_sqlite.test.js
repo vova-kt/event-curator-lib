@@ -10,36 +10,66 @@ function tmpDb() {
   return join(tmpdir(), `events-curator-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
 }
 
-test('sqlite: re-init on existing db is idempotent', async () => {
+test('sqlite: re-init on existing db is idempotent and shown rows survive', async () => {
   const path = tmpDb();
   try {
     const s1 = sqlite({ path });
     await s1.init();
     const e = makeEvent({ title: 'Persist' });
     await s1.upsertEvents([e]);
+    await s1.markShown([e.id], { city: 'Berlin', queryText: 'comedy' });
     await s1.close();
 
     const s2 = sqlite({ path });
     await s2.init();
-    const seen = await s2.getSeenIds([e.id]);
-    assert.deepEqual([...seen], [e.id]);
+    const shown = await s2.getShownIds([e.id]);
+    assert.deepEqual([...shown], [e.id]);
     await s2.close();
   } finally {
     if (existsSync(path)) unlinkSync(path);
   }
 });
 
-test('sqlite: upsert + getSeenIds round-trip', async () => {
+test('sqlite: upsertEvents alone does not mark events shown', async () => {
   const path = tmpDb();
   try {
     const s = sqlite({ path });
     await s.init();
     const e = makeEvent({ title: 'Roundtrip' });
     await s.upsertEvents([e]);
-    const seen = await s.getSeenIds([e.id, 'evt_missing']);
-    assert.deepEqual([...seen], [e.id]);
+    const shown = await s.getShownIds([e.id, 'evt_missing']);
+    assert.equal(shown.size, 0);
     const fetched = await s.getEvents([e.id]);
     assert.equal(fetched[0]?.title, 'Roundtrip');
+    await s.close();
+  } finally {
+    if (existsSync(path)) unlinkSync(path);
+  }
+});
+
+test('sqlite: markShown + listShown per saved query', async () => {
+  const path = tmpDb();
+  try {
+    const s = sqlite({ path });
+    await s.init();
+    const a = makeEvent({ title: 'A' });
+    const b = makeEvent({ title: 'B' });
+    const c = makeEvent({ title: 'C' });
+    await s.upsertEvents([a, b, c]);
+    await s.markShown([a.id, b.id], { city: 'Berlin', queryText: 'comedy' });
+    await s.markShown([c.id], { city: 'Berlin', queryText: 'jazz' });
+
+    const shown = await s.getShownIds([a.id, b.id, c.id, 'missing']);
+    assert.deepEqual([...shown].sort(), [a.id, b.id, c.id].sort());
+
+    const comedy = await s.listShown({ city: 'Berlin', queryText: 'comedy' });
+    assert.deepEqual(comedy.map((e) => e.id).sort(), [a.id, b.id].sort());
+
+    const jazz = await s.listShown({ city: 'Berlin', queryText: 'jazz' });
+    assert.deepEqual(jazz.map((e) => e.id), [c.id]);
+
+    const limited = await s.listShown({ city: 'Berlin', queryText: 'comedy' }, { limit: 1 });
+    assert.equal(limited.length, 1);
     await s.close();
   } finally {
     if (existsSync(path)) unlinkSync(path);

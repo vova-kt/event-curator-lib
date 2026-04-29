@@ -29,10 +29,11 @@ function relativeTime(iso) {
  *   e          — edit selected
  *   n          — create new
  *   d          — delete (asks for confirm)
+ *   h          — open history view (events already shown to the user)
  *   k          — keys screen (if available)
  *   q          — quit
  */
-export default function SavedQueriesScreen({ queries, onRun, onEdit, onNew, onDelete, onEditKeys, onQuit }) {
+export default function SavedQueriesScreen({ queries, onRun, onEdit, onNew, onDelete, onHistory, onEditKeys, onQuit }) {
   const [cursor, setCursor] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(/** @type {null | { city: string, queryText: string }} */ (null));
 
@@ -62,6 +63,8 @@ export default function SavedQueriesScreen({ queries, onRun, onEdit, onNew, onDe
       if (selected) onEdit(selected);
     } else if (queries.length > 0 && input === 'd') {
       if (selected) setConfirmDelete({ city: selected.city, queryText: selected.queryText });
+    } else if (queries.length > 0 && input === 'h') {
+      if (selected && onHistory) onHistory(selected);
     } else if (input === 'K' && onEditKeys) {
       onEditKeys();
     } else if (input === 'q') {
@@ -106,7 +109,7 @@ export default function SavedQueriesScreen({ queries, onRun, onEdit, onNew, onDe
           </Text>
         ) : (
           <Text dimColor>
-            ↑/↓ move · enter run · [e] edit · [n] new · [d] delete{onEditKeys ? ' · [K] keys' : ''} · [q] quit
+            ↑/↓ move · enter run · [e] edit · [n] new · [d] delete · [h] history{onEditKeys ? ' · [K] keys' : ''} · [q] quit
           </Text>
         )}
       </Box>

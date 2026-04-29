@@ -33,6 +33,8 @@ export { rules } from './strategies/filter/index.js';
 /**
  * @typedef {Object} Curator
  * @property {(query: import('./core/types.js').Query, opts?: CurateOptions) => Promise<{ events: import('./core/types.js').Event[] }>} curate
+ * @property {(ids: string[], ref: import('./core/types.js').ShownRef) => Promise<void>} markShown
+ * @property {(ref: import('./core/types.js').ShownRef, opts?: import('./core/types.js').ListShownOptions) => Promise<import('./core/types.js').Event[]>} listShown
  * @property {(picks: { liked: string[], disliked: string[] }) => Promise<void>} recordFeedback
  * @property {(scope?: import('./core/types.js').PreferenceScope) => Promise<void>} clearPreferences
  * @property {() => Promise<import('./core/types.js').SavedQuery[]>} listSavedQueries
@@ -89,6 +91,15 @@ export async function createCurator(opts) {
       // No-op when this query wasn't run from a saved entry.
       await opts.storage.touchSavedQuery({ city: query.city, queryText: query.queryText });
       return { events };
+    },
+
+    async markShown(ids, ref) {
+      if (ids.length === 0) return;
+      await opts.storage.markShown(ids, ref);
+    },
+
+    async listShown(ref, listOpts) {
+      return opts.storage.listShown(ref, listOpts);
     },
 
     async recordFeedback(picks) {

@@ -8,7 +8,7 @@
 
 import { scopeKey, effectiveScopeKeys, emptyPreference, mergePreferences } from './scope.js';
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** @param {{ city: string, queryText: string }} ref */
 const savedKey = (ref) => `${ref.city}|${ref.queryText}`;
@@ -47,19 +47,76 @@ export function indexeddb({ name = 'events-curator' } = {}) {
           ...e,
           firstSeenAt: existing?.firstSeenAt ?? e.firstSeenAt ?? now,
           lastSeenAt: now,
+          lastShownAt: existing?.lastShownAt ?? e.lastShownAt,
         });
       }
       await txDone(tx);
     },
 
-    async getSeenIds(ids) {
+    async markShown(ids, ref) {
       const d = ensureOpen();
-      const tx = d.transaction('events', 'readonly');
-      const store = tx.objectStore('events');
+      if (ids.length === 0) return;
+      const now = new Date().toISOString();
+      const tx = d.transaction(['eventViews', 'events'], 'readwrite');
+      const views = tx.objectStore('eventViews');
+      const events = tx.objectStore('events');
+      for (const id of ids) {
+        const _key = `${ref.city}|${ref.queryText}|${id}`;
+        views.put({ _key, eventId: id, city: ref.city, queryText: ref.queryText, shownAt: now });
+        const e = await reqAsPromise(events.get(id));
+        if (e) events.put({ ...e, lastShownAt: now });
+      }
+      await txDone(tx);
+    },
+
+    async getShownIds(ids) {
+      const d = ensureOpen();
+      const tx = d.transaction('eventViews', 'readonly');
+      const store = tx.objectStore('eventViews');
+      const idx = store.index('eventId');
       const out = new Set();
       for (const id of ids) {
-        const row = await reqAsPromise(store.get(id));
-        if (row) out.add(id);
+        const cursor = /** @type {IDBKeyRange} */ (IDBKeyRange.only(id));
+        const got = await reqAsPromise(idx.openCursor(cursor));
+        if (got) out.add(id);
+      }
+      await txDone(tx);
+      return out;
+    },
+
+    async listShown(ref, opts) {
+      const d = ensureOpen();
+      const tx = d.transaction(['eventViews', 'events'], 'readonly');
+      const views = tx.objectStore('eventViews');
+      const idx = views.index('cityQueryShown');
+      // Range over [city, queryText, '\u0000'] .. [city, queryText, '\uffff']
+      const range = IDBKeyRange.bound(
+        [ref.city, ref.queryText, '\u0000'],
+        [ref.city, ref.queryText, '\uffff'],
+      );
+      /** @type {Array<{ eventId: string, shownAt: string }>} */
+      const rows = [];
+      await new Promise((resolve, reject) => {
+        const req = idx.openCursor(range, 'prev');
+        req.onsuccess = () => {
+          const cursor = req.result;
+          if (cursor) {
+            const v = cursor.value;
+            rows.push({ eventId: v.eventId, shownAt: v.shownAt });
+            if (opts?.limit && rows.length >= opts.limit) { resolve(undefined); return; }
+            cursor.continue();
+          } else {
+            resolve(undefined);
+          }
+        };
+        req.onerror = () => reject(req.error);
+      });
+      const events = tx.objectStore('events');
+      /** @type {import('../../core/types.js').Event[]} */
+      const out = [];
+      for (const r of rows) {
+        const e = await reqAsPromise(events.get(r.eventId));
+        if (e) out.push(e);
       }
       await txDone(tx);
       return out;
@@ -215,10 +272,20 @@ function openDb(name) {
         preferences: 'scope',
         kv: 'key',
         savedQueries: '_key',
+        eventViews: '_key',
       };
       for (const [store, keyPath] of Object.entries(keyPaths)) {
         if (!d.objectStoreNames.contains(store)) {
           d.createObjectStore(store, { keyPath });
+        }
+      }
+      const views = req.transaction?.objectStore('eventViews');
+      if (views) {
+        if (!views.indexNames.contains('eventId')) {
+          views.createIndex('eventId', 'eventId', { unique: false });
+        }
+        if (!views.indexNames.contains('cityQueryShown')) {
+          views.createIndex('cityQueryShown', ['city', 'queryText', 'shownAt'], { unique: false });
         }
       }
     };

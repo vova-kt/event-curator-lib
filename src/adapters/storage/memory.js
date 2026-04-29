@@ -17,10 +17,15 @@ export function memory() {
   const kv = new Map();
   /** @type {Map<string, import('../../core/types.js').SavedQuery>} */
   const savedQueries = new Map();
+  // event_views junction: key `${city}|${queryText}|${eventId}` -> shownAt ISO.
+  /** @type {Map<string, { eventId: string, city: string, queryText: string, shownAt: string }>} */
+  const views = new Map();
   let initialized = false;
 
   /** @param {{ city: string, queryText: string }} ref */
   const savedKey = (ref) => `${ref.city}|${ref.queryText}`;
+  /** @param {{ city: string, queryText: string, eventId: string }} v */
+  const viewKey = (v) => `${v.city}|${v.queryText}|${v.eventId}`;
 
   function ensureOpen() {
     if (!initialized) throw new Error('storage not initialized: call init() first');
@@ -36,6 +41,7 @@ export function memory() {
       preferences.clear();
       kv.clear();
       savedQueries.clear();
+      views.clear();
       initialized = false;
     },
 
@@ -48,14 +54,44 @@ export function memory() {
           ...e,
           firstSeenAt: existing?.firstSeenAt ?? e.firstSeenAt ?? now,
           lastSeenAt: now,
+          lastShownAt: existing?.lastShownAt ?? e.lastShownAt,
         });
       }
     },
 
-    async getSeenIds(ids) {
+    async markShown(ids, ref) {
       ensureOpen();
+      const now = new Date().toISOString();
+      for (const id of ids) {
+        views.set(viewKey({ city: ref.city, queryText: ref.queryText, eventId: id }), {
+          eventId: id, city: ref.city, queryText: ref.queryText, shownAt: now,
+        });
+        const existing = events.get(id);
+        if (existing) events.set(id, { ...existing, lastShownAt: now });
+      }
+    },
+
+    async getShownIds(ids) {
+      ensureOpen();
+      const set = new Set();
+      for (const v of views.values()) set.add(v.eventId);
       const out = new Set();
-      for (const id of ids) if (events.has(id)) out.add(id);
+      for (const id of ids) if (set.has(id)) out.add(id);
+      return out;
+    },
+
+    async listShown(ref, opts) {
+      ensureOpen();
+      const matches = [...views.values()]
+        .filter((v) => v.city === ref.city && v.queryText === ref.queryText)
+        .sort((a, b) => b.shownAt.localeCompare(a.shownAt));
+      const limited = opts?.limit ? matches.slice(0, opts.limit) : matches;
+      /** @type {import('../../core/types.js').Event[]} */
+      const out = [];
+      for (const v of limited) {
+        const e = events.get(v.eventId);
+        if (e) out.push(e);
+      }
       return out;
     },
 

@@ -12,7 +12,7 @@ import { Screen } from './screens/screen.js';
 import KeysScreen from './screens/Keys.jsx';
 import SavedQueriesScreen from './screens/SavedQueries.jsx';
 import QueryEditorScreen from './screens/QueryEditor.jsx';
-import ResultsScreen from './screens/Results.jsx';
+import ResultsScreen, { Mode as ResultsMode } from './screens/Results.jsx';
 import DetailsScreen from './screens/Details.jsx';
 import ProgressScreen from './screens/Progress.jsx';
 
@@ -31,9 +31,12 @@ export default function App({ dry }) {
   const [resultsCursor, setResultsCursor] = useState(0);
   const [resultsMarks, setResultsMarks] = useState(/** @type {Record<string, 'like'|'dislike'>} */ ({}));
   const [detailsIndex, setDetailsIndex] = useState(0);
+  const [detailsSource, setDetailsSource] = useState(/** @type {'results'|'history'} */ ('results'));
   const [savedQueries, setSavedQueries] = useState(/** @type {import('../../src/core/types.js').SavedQuery[]} */ ([]));
   const [editing, setEditing] = useState(/** @type {null | import('../../src/core/types.js').SavedQuery} */ (null));
   const [activeQuery, setActiveQuery] = useState(/** @type {null | import('../../src/core/types.js').SavedQuery} */ (null));
+  const [history, setHistory] = useState(/** @type {import('../../src/core/types.js').Event[]} */ ([]));
+  const [historyCursor, setHistoryCursor] = useState(0);
   const [status, setStatus] = useState(null);
 
   useInput((input, key) => {
@@ -173,6 +176,27 @@ export default function App({ dry }) {
     setScreen(Screen.SAVED_LIST);
   };
 
+  const handlePageVisible = async (ids) => {
+    if (!curator || !activeQuery) return;
+    try {
+      await curator.markShown(ids, { city: activeQuery.city, queryText: activeQuery.queryText });
+    } catch {
+      // Marking is best-effort. A storage hiccup mustn't crash the TUI mid-scroll.
+    }
+  };
+
+  const handleOpenHistory = async (q) => {
+    setActiveQuery(q);
+    try {
+      const events = await curator.listShown({ city: q.city, queryText: q.queryText });
+      setHistory(events);
+      setHistoryCursor(0);
+      setScreen(Screen.HISTORY);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const handleQuit = async () => {
     await cleanup();
     exit();
@@ -218,6 +242,7 @@ export default function App({ dry }) {
             onEdit={(q) => { setEditing(q); setScreen(Screen.EDITOR); }}
             onNew={() => { setEditing(null); setScreen(Screen.EDITOR); }}
             onDelete={handleDeleteQuery}
+            onHistory={handleOpenHistory}
             onEditKeys={dry ? null : handleEditKeys}
             onQuit={handleQuit}
           />
@@ -245,27 +270,48 @@ export default function App({ dry }) {
             setMarks={setResultsMarks}
             onSubmit={handleFeedback}
             onBack={() => setScreen(Screen.SAVED_LIST)}
-            onOpenDetails={(idx) => { setDetailsIndex(idx); setScreen(Screen.DETAILS); }}
+            onOpenDetails={(idx) => { setDetailsSource('results'); setDetailsIndex(idx); setScreen(Screen.DETAILS); }}
+            mode={ResultsMode.CURATED}
+            onPageVisible={handlePageVisible}
           />
         )}
 
-        {!error && screen === Screen.DETAILS && (
-          <DetailsScreen
-            event={results[detailsIndex]}
-            mark={resultsMarks[results[detailsIndex]?.id]}
-            onToggleLike={() => {
-              const id = results[detailsIndex]?.id;
-              if (!id) return;
-              setResultsMarks({ ...resultsMarks, [id]: resultsMarks[id] === 'like' ? undefined : 'like' });
-            }}
-            onToggleDislike={() => {
-              const id = results[detailsIndex]?.id;
-              if (!id) return;
-              setResultsMarks({ ...resultsMarks, [id]: resultsMarks[id] === 'dislike' ? undefined : 'dislike' });
-            }}
-            onBack={() => setScreen(Screen.RESULTS)}
+        {!error && screen === Screen.HISTORY && (
+          <ResultsScreen
+            events={history}
+            cursor={historyCursor}
+            setCursor={setHistoryCursor}
+            marks={{}}
+            setMarks={() => {}}
+            onSubmit={() => { setActiveQuery(null); setScreen(Screen.SAVED_LIST); }}
+            onBack={() => { setActiveQuery(null); setScreen(Screen.SAVED_LIST); }}
+            onOpenDetails={(idx) => { setDetailsSource('history'); setDetailsIndex(idx); setScreen(Screen.DETAILS); }}
+            mode={ResultsMode.HISTORY}
           />
         )}
+
+        {!error && screen === Screen.DETAILS && (() => {
+          const list = detailsSource === 'history' ? history : results;
+          const event = list[detailsIndex];
+          const isHistory = detailsSource === 'history';
+          return (
+            <DetailsScreen
+              event={event}
+              mark={isHistory ? undefined : resultsMarks[event?.id]}
+              onToggleLike={isHistory ? undefined : () => {
+                const id = event?.id;
+                if (!id) return;
+                setResultsMarks({ ...resultsMarks, [id]: resultsMarks[id] === 'like' ? undefined : 'like' });
+              }}
+              onToggleDislike={isHistory ? undefined : () => {
+                const id = event?.id;
+                if (!id) return;
+                setResultsMarks({ ...resultsMarks, [id]: resultsMarks[id] === 'dislike' ? undefined : 'dislike' });
+              }}
+              onBack={() => setScreen(isHistory ? Screen.HISTORY : Screen.RESULTS)}
+            />
+          );
+        })()}
 
         {footer}
       </Box>

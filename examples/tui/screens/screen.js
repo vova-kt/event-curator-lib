@@ -10,4 +10,5 @@ export const Screen = Object.freeze({
   PROGRESS: 'progress',
   RESULTS: 'results',
   DETAILS: 'details',
+  HISTORY: 'history',
 });

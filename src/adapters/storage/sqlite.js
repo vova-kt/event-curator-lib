@@ -17,10 +17,21 @@ const SCHEMA = `
     source_json TEXT NOT NULL,
     price_json TEXT,
     first_seen_at TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL
+    last_seen_at TEXT NOT NULL,
+    last_shown_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_events_city ON events(city);
   CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at);
+
+  CREATE TABLE IF NOT EXISTS event_views (
+    event_id TEXT NOT NULL,
+    city TEXT NOT NULL,
+    query_text TEXT NOT NULL,
+    shown_at TEXT NOT NULL,
+    PRIMARY KEY (event_id, city, query_text)
+  );
+  CREATE INDEX IF NOT EXISTS idx_event_views_query ON event_views(city, query_text, shown_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_event_views_event ON event_views(event_id);
 
   CREATE TABLE IF NOT EXISTS preferences (
     scope TEXT PRIMARY KEY,
@@ -83,11 +94,11 @@ export function sqlite({ path }) {
         INSERT INTO events (
           id, title, description, starts_at, ends_at, city,
           venue_json, source_json, price_json,
-          first_seen_at, last_seen_at
+          first_seen_at, last_seen_at, last_shown_at
         ) VALUES (
           @id, @title, @description, @starts_at, @ends_at, @city,
           @venue_json, @source_json, @price_json,
-          @first_seen_at, @last_seen_at
+          @first_seen_at, @last_seen_at, @last_shown_at
         )
         ON CONFLICT(id) DO UPDATE SET
           title = excluded.title,
@@ -105,14 +116,48 @@ export function sqlite({ path }) {
       tx(events);
     },
 
-    async getSeenIds(ids) {
+    async markShown(ids, ref) {
+      const d = ensureOpen();
+      if (ids.length === 0) return;
+      const now = new Date().toISOString();
+      const insertView = d.prepare(`
+        INSERT INTO event_views (event_id, city, query_text, shown_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(event_id, city, query_text) DO UPDATE SET shown_at = excluded.shown_at
+      `);
+      const bumpEvent = d.prepare(`UPDATE events SET last_shown_at = ? WHERE id = ?`);
+      const tx = d.transaction(() => {
+        for (const id of ids) {
+          insertView.run(id, ref.city, ref.queryText, now);
+          bumpEvent.run(now, id);
+        }
+      });
+      tx();
+    },
+
+    async getShownIds(ids) {
       const d = ensureOpen();
       if (ids.length === 0) return new Set();
       const placeholders = ids.map(() => '?').join(',');
-      const rows = /** @type {{ id: string }[]} */ (
-        d.prepare(`SELECT id FROM events WHERE id IN (${placeholders})`).all(...ids)
+      const rows = /** @type {{ event_id: string }[]} */ (
+        d.prepare(`SELECT DISTINCT event_id FROM event_views WHERE event_id IN (${placeholders})`).all(...ids)
       );
-      return new Set(rows.map((r) => r.id));
+      return new Set(rows.map((r) => r.event_id));
+    },
+
+    async listShown(ref, opts) {
+      const d = ensureOpen();
+      const limit = opts?.limit;
+      const sql = `
+        SELECT e.* FROM events e
+        JOIN event_views v ON v.event_id = e.id
+        WHERE v.city = ? AND v.query_text = ?
+        ORDER BY v.shown_at DESC
+        ${limit ? 'LIMIT ?' : ''}
+      `;
+      const params = limit ? [ref.city, ref.queryText, limit] : [ref.city, ref.queryText];
+      const rows = /** @type {EventRow[]} */ (d.prepare(sql).all(...params));
+      return rows.map(rowToEvent);
     },
 
     async getEvents(ids) {
@@ -264,6 +309,7 @@ export function sqlite({ path }) {
  * @property {string|null} price_json
  * @property {string} first_seen_at
  * @property {string} last_seen_at
+ * @property {string|null} last_shown_at
  */
 
 /**
@@ -293,6 +339,7 @@ function eventToRow(e, now) {
     price_json: e.price ? JSON.stringify(e.price) : null,
     first_seen_at: e.firstSeenAt ?? now,
     last_seen_at: now,
+    last_shown_at: e.lastShownAt ?? null,
   };
 }
 
@@ -312,6 +359,7 @@ function rowToEvent(row) {
     price: row.price_json ? JSON.parse(row.price_json) : undefined,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
+    lastShownAt: row.last_shown_at ?? undefined,
   };
 }
 

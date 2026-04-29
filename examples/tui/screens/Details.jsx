@@ -27,9 +27,9 @@ export default function DetailsScreen({ event, mark, onToggleLike, onToggleDisli
   useInput((input, key) => {
     if (key.escape || key.leftArrow || input === 'q' || key.return) {
       onBack();
-    } else if (input === 'l') {
+    } else if (input === 'l' && onToggleLike) {
       onToggleLike();
-    } else if (input === 'd') {
+    } else if (input === 'd' && onToggleDislike) {
       onToggleDislike();
     }
   });
@@ -72,7 +72,7 @@ export default function DetailsScreen({ event, mark, onToggleLike, onToggleDisli
         </Box>
       )}
       <Box marginTop={1}>
-        <Text dimColor>[l] like · [d] dislike · enter/esc/← back</Text>
+        <Text dimColor>{onToggleLike ? '[l] like · [d] dislike · ' : ''}enter/esc/← back</Text>
       </Box>
     </Box>
   );
