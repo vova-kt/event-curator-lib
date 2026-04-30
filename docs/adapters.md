@@ -82,7 +82,6 @@ Stages call `ctx.llm.chat({ system, messages, json: true })` with prompts loaded
  * @property {(ref: SavedQueryRef) => Promise<EventStateRecord[]>} getEventStates
  * @property {(ids: string[], ref: SavedQueryRef) => Promise<Set<string>>} getShownIds  // state ∈ {Shown, Liked, Disliked}
  * @property {(ref: SavedQueryRef, opts?: { limit?: number }) => Promise<Event[]>} listShown
- * @property {(ids: string[]) => Promise<Event[]>} getEvents
  *
  * @property {(opts?: { includeArchived?: boolean }) => Promise<SavedQuery[]>} listSavedQueries
  * @property {(ref: SavedQueryRef) => Promise<SavedQuery | undefined>} getSavedQuery

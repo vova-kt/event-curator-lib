@@ -13,8 +13,6 @@ test('memory storage: upsertEvents stores events but does not mark them shown', 
   const e1 = makeEvent({ title: 'A' });
   const e2 = makeEvent({ title: 'B' });
   await s.upsertEvents([e1, e2]);
-  const fetched = await s.getEvents([e1.id, e2.id]);
-  assert.equal(fetched.length, 2);
   // No state rows yet — getShownIds returns empty under any ref.
   const shown = await s.getShownIds([e1.id, e2.id, 'evt_does_not_exist'], REF_A);
   assert.equal(shown.size, 0);

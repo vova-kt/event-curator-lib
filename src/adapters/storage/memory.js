@@ -126,17 +126,6 @@ export function memory() {
       return out;
     },
 
-    async getEvents(ids) {
-      ensureOpen();
-      /** @type {import('../../core/types.js').Event[]} */
-      const out = [];
-      for (const id of ids) {
-        const e = events.get(id);
-        if (e) out.push(e);
-      }
-      return out;
-    },
-
     async listSavedQueries(opts) {
       ensureOpen();
       const includeArchived = opts?.includeArchived ?? false;

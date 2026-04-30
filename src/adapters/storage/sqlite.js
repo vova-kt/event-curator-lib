@@ -202,16 +202,6 @@ export function sqlite({ path }) {
       return rows.map(rowToEvent);
     },
 
-    async getEvents(ids) {
-      const d = ensureOpen();
-      if (ids.length === 0) return [];
-      const placeholders = ids.map(() => '?').join(',');
-      const rows = /** @type {EventRow[]} */ (
-        d.prepare(`SELECT * FROM events WHERE id IN (${placeholders})`).all(...ids)
-      );
-      return rows.map(rowToEvent);
-    },
-
     async listSavedQueries(opts) {
       const d = ensureOpen();
       const includeArchived = opts?.includeArchived ?? false;

@@ -92,7 +92,7 @@ export const DEFAULTS = Object.freeze({
      * of `level` — the file always captures debug-level detail. Browser
      * environments silently skip file output. `null` disables file logging.
      */
-    file: /** @type {string|null} */ ('curator.log'),
+    file: /** @type {string|null} */ ('./curator.log'),
   },
 });
 

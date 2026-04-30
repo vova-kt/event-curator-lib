@@ -43,8 +43,6 @@ test('sqlite: upsertEvents alone does not mark events shown', async () => {
     await s.upsertEvents([e]);
     const shown = await s.getShownIds([e.id, 'evt_missing'], REF_A);
     assert.equal(shown.size, 0);
-    const fetched = await s.getEvents([e.id]);
-    assert.equal(fetched[0]?.title, 'Roundtrip');
     await s.close();
   } finally {
     if (existsSync(path)) unlinkSync(path);

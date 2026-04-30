@@ -19,7 +19,6 @@
     "./adapters/storage/memory": "./src/adapters/storage/memory.js",
     "./strategies/queryExpansion": "./src/strategies/queryExpansion/index.js",
     "./strategies/dedupe": "./src/strategies/dedupe/index.js",
-    "./strategies/filter": "./src/strategies/filter/index.js",
     "./strategies/rank": "./src/strategies/rank/index.js"
   },
   "files": [

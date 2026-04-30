@@ -176,19 +176,6 @@ export function indexeddb({ name = 'events-curator' } = {}) {
       return out;
     },
 
-    async getEvents(ids) {
-      const d = ensureOpen();
-      const tx = d.transaction('events', 'readonly');
-      const store = tx.objectStore('events');
-      const out = [];
-      for (const id of ids) {
-        const row = await reqAsPromise(store.get(id));
-        if (row) out.push(row);
-      }
-      await txDone(tx);
-      return out;
-    },
-
     async listSavedQueries(opts) {
       const d = ensureOpen();
       const includeArchived = opts?.includeArchived ?? false;

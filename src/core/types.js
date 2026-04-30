@@ -195,7 +195,6 @@
  * @property {(ref: SavedQueryRef) => Promise<EventStateRecord[]>} getEventStates
  * @property {(ids: string[], ref: SavedQueryRef) => Promise<Set<string>>} getShownIds
  * @property {(ref: SavedQueryRef, opts?: ListShownOptions) => Promise<Event[]>} listShown
- * @property {(ids: string[]) => Promise<Event[]>} getEvents
  * @property {(opts?: ListSavedQueriesOptions) => Promise<SavedQuery[]>} listSavedQueries
  * @property {(ref: SavedQueryRef) => Promise<SavedQuery | undefined>} getSavedQuery
  * @property {(q: SavedQuery) => Promise<SavedQuery>} upsertSavedQuery
