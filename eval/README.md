@@ -16,8 +16,8 @@ The full reference is [docs/eval.md](../docs/eval.md). This file is a quickstart
 ```sh
 # 1. Fetch search results once. Commit the resulting fixture.
 TAVILY_API_KEY=... node eval/scripts/fetch-search.js \
-  --query "standup comedy in russian" \
-  --city "New York" \
+  --query "standup comedy in russian and english language" \
+  --city "berling" \
   --days 90 \
   --search tavily
 
