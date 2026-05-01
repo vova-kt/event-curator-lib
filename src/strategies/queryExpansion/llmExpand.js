@@ -7,19 +7,18 @@
  * `templates` strategy so a transient LLM hiccup doesn't reduce discovery to zero queries.
  */
 
-import { expandQueriesPrompt } from '../../prompts/expandQueries.js';
+import { expandQueriesPrompt } from '../../prompts/index.js';
 import { resolveTimeframe } from '../../core/timeframe.js';
 import { templates } from './templates.js';
 
 const CACHE_PREFIX = 'qx:llmExpand:v2';
 
 /**
- * @param {{ limit?: number }} [opts]
  * @returns {import('../../core/types.js').QueryExpansionStrategy}
  */
-export function llmExpand({ limit } = {}) {
+export function llmExpand() {
   return async function llmExpandStrategy(ctx) {
-    const cap = limit ?? ctx.config.queryExpansion.defaultLimit;
+    const cap = ctx.config.queryExpansion.defaultLimit;
     const tf = resolveTimeframe(ctx.query.timeframe, ctx.config.pipeline.defaultRollingDays);
     const key = cacheKey(ctx.query.city, ctx.query.queryText, tf);
 

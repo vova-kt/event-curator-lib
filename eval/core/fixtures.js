@@ -43,6 +43,21 @@ const FIXTURES_DIR = resolve(HERE, '..', 'fixtures');
  * @property {GoldenEvent[]} events
  */
 
+/**
+ * @typedef {Object} ExpandInputFixture
+ * @property {string} slug
+ * @property {{ city: string, queryText: string }} query
+ * @property {{ from: string, to: string }} timeframe
+ * @property {number} [limit]
+ * @property {string[]} [nativeLanguageHints]   // substrings expected to appear in some queries when the city's primary language isn't English
+ */
+
+/**
+ * @typedef {Object} ExpandGoldenFixture
+ * @property {string} slug
+ * @property {string[]} queries
+ */
+
 /** @param {string} slug */
 export function searchFixturePath(slug) {
   return resolve(FIXTURES_DIR, `${slug}.search.json`);
@@ -51,6 +66,16 @@ export function searchFixturePath(slug) {
 /** @param {string} slug */
 export function goldenFixturePath(slug) {
   return resolve(FIXTURES_DIR, `${slug}.golden.json`);
+}
+
+/** @param {string} slug */
+export function expandInputFixturePath(slug) {
+  return resolve(FIXTURES_DIR, `${slug}.expand-input.json`);
+}
+
+/** @param {string} slug */
+export function expandGoldenFixturePath(slug) {
+  return resolve(FIXTURES_DIR, `${slug}.expand-golden.json`);
 }
 
 /**
@@ -95,6 +120,16 @@ export function writeGoldenFixture(fixture) {
   const path = goldenFixturePath(fixture.slug);
   writeFileSync(path, JSON.stringify(fixture, null, 2) + '\n');
   return path;
+}
+
+/**
+ * @param {string} slug
+ * @returns {ExpandGoldenFixture | null}
+ */
+export function loadExpandGoldenFixture(slug) {
+  const path = expandGoldenFixturePath(slug);
+  if (!existsSync(path)) return null;
+  return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 /** @param {string} dir */

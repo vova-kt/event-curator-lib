@@ -17,13 +17,18 @@ Manual-only pipelines for evaluating LLM-driven stages (extract today, rank next
 
 ```
 eval/
-  core/        # reusable across eval kinds (slugs, fixtures, runs, matching, metrics, report, ctx, cli)
-  scripts/     # CLIs: fetch-search, run-extract, promote-golden
+  core/        # reusable across eval kinds (slug, fixtures, runs, runKind, matching, metrics, report, ctx, env)
+  scripts/     # CLIs: fetch-search, run-extract, run-expand, promote-golden
+  config.js    # parameters per script
   fixtures/    # committed
   runs/        # gitignored
 ```
 
-See [eval/core/](../eval/core/) and [eval/scripts/](../eval/scripts/) for what each module does — file names track responsibilities one-to-one.
+See [eval/core/](../eval/core/) and [eval/scripts/](../eval/scripts/) for what each module does — file names track responsibilities one-to-one. In-tree conventions and "how to add a new eval kind" live in [eval/CLAUDE.md](../eval/CLAUDE.md).
+
+## How scripts are configured
+
+There are no CLI flags. Every script reads its parameters from [eval/config.js](../eval/config.js). The iteration loop is "edit the relevant block, save, run" — no shell-quoting, no flag-name memorization. API keys still come from the environment: run scripts under `node --env-file=.env.dev` so `OPENAI_API_KEY` and friends land in `process.env` without leaking into source.
 
 ## Fixture format
 
@@ -44,25 +49,22 @@ See [eval/core/](../eval/core/) and [eval/scripts/](../eval/scripts/) for what e
 
 ## Workflow
 
-```sh
-# 1. Fetch fixture (once per slug; commit the result).
-#    Add --expand templates for 4 deterministic phrasings (no LLM), or
-#    --expand llm for LLM-generated variants (requires OPENAI_API_KEY).
-TAVILY_API_KEY=... node eval/scripts/fetch-search.js \
-  --query "standup comedy in russian" --city "New York" --days 90 --search tavily \
-  [--expand templates|llm] [--model <id>]
+Edit the relevant block in [eval/config.js](../eval/config.js) before each step.
 
-# 2. Run extraction.
-OPENAI_API_KEY=... node eval/scripts/run-extract.js --fixture <slug>
-
-# 3. First time: hand-curate the run JSON into eval/fixtures/<slug>.golden.json,
-#    commit. Subsequent runs compare against it.
-
-# 4. Iterate on src/prompts/extractEvents.js, rerun step 2.
-
-# 5. Promote a reviewed run to the new golden once the change is clearly better.
-node eval/scripts/promote-golden.js --fixture <slug>
-```
+1. **Fetch fixture** (once per slug; commit the result). `config.fetchSearch` controls query/city/days/search/expand. `expand: 'templates'` fans out to 4 deterministic phrasings; `expand: 'llm'` uses `llmExpand`; `null` is a single literal search.
+   ```sh
+   node --env-file=.env.dev eval/scripts/fetch-search.js
+   ```
+2. **Run extraction**. Set `config.runExtract.fixture` to the slug.
+   ```sh
+   node --env-file=.env.dev eval/scripts/run-extract.js
+   ```
+3. **First time**: hand-curate the run JSON into `eval/fixtures/<slug>.golden.json`, commit. Subsequent runs compare against it.
+4. **Iterate** on [src/prompts/extractEvents.js](../src/prompts/extractEvents.js), rerun step 2.
+5. **Promote** a reviewed run to the new golden once the change is clearly better. Set `config.promoteGolden.fixture`.
+   ```sh
+   node eval/scripts/promote-golden.js
+   ```
 
 ## What the metrics measure (and don't)
 
@@ -72,6 +74,14 @@ Defined in [eval/core/metrics.js](../eval/core/metrics.js); field comparators in
 - **Precision**: candidate events that match a golden event.
 - **Field accuracy on matched pairs**: date within ±1 calendar day; venue name normalized substring match. Computed only over matched pairs — doesn't penalize the extractor for missing events; that's recall's job.
 - **Hallucination signal**: candidate titles whose tokens don't appear in any source page. **Soft signal** — false positives are common when the LLM rephrases a title, so this is reported separately, not folded into precision.
+
+## Query-expansion eval
+
+[eval/scripts/run-expand.js](../eval/scripts/run-expand.js) calls the `llmExpand` strategy directly with a real LLM, then reports four metrics over the returned queries: golden coverage (against a hand-curated must-have list), pairwise diversity, constraint compliance against the prompt rules in [src/prompts/expandQueries.js](../src/prompts/expandQueries.js), and language coverage against a per-config `expectedLanguages` list (ISO 639-3 codes the city's audience speaks). Language detection uses Unicode-block fast paths for non-Latin scripts and `franc-min` for Latin-script disambiguation, biased toward the expected set so franc's noisy short-text guesses don't wander into irrelevant languages — see [eval/core/queryHeuristics.js](../eval/core/queryHeuristics.js).
+
+The script accepts an array of query configs and dispatches them in parallel, emitting a per-config report plus a generalized aggregate summary (averaged quality, total violations, per-config one-liner) so a single run answers "did this prompt change improve things on average across the test set?".
+
+Fixtures: `<slug>.expand-input.json` (city, queryText, timeframe, optional limit and `nativeLanguageHints`) and `<slug>.expand-golden.json` (`{ queries: string[] }`). Both are hand-authored — there is no fetch step, since the input to expansion is just the query itself. Configure via `config.runExpand`; run with `node --env-file=.env.dev eval/scripts/run-expand.js`.
 
 ## Why the eval calls `extract()` directly
 

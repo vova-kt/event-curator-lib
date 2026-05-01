@@ -53,12 +53,12 @@ test('llmExpand: caps result to limit and persists to KV', async () => {
   await storage.init();
   const ctx = makeCtx({ llm, storage });
 
-  const out = await llmExpand({ limit: 3 })(ctx);
+  const out = await llmExpand()(ctx);
   assert.equal(out.length, 3);
   assert.equal(llmCalls, 1);
 
   // Cache hit: same key, no second LLM call.
-  const out2 = await llmExpand({ limit: 3 })(ctx);
+  const out2 = await llmExpand()(ctx);
   assert.deepEqual(out2, out);
   assert.equal(llmCalls, 1);
 });

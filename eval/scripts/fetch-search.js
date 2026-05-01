@@ -7,43 +7,28 @@
  * query parameters so downstream eval scripts (run-extract, future run-rank)
  * are reproducible without re-hitting the search API.
  *
- * Without `--expand`, a single literal "<queryText> <city>" query is used.
- * Pass `--expand templates` to fan out via the templates query-expansion
- * strategy (4 deterministic phrasings, no LLM). Pass `--expand llm` to use
- * llmExpand (requires OPENAI_API_KEY; pass `--model <id>` to override the
- * default gpt-4o-mini). Results across all queries are merged and deduplicated
- * by URL before writing the fixture.
+ * With `expand: null`, a single literal "<query> <city>" search is issued.
+ * `expand: 'templates'` fans out via 4 deterministic phrasings (no LLM).
+ * `expand: 'llm'` uses llmExpand (requires OPENAI_API_KEY). Results across
+ * all queries are merged and deduplicated by URL before writing the fixture.
  *
- * Usage:
- *   node eval/scripts/fetch-search.js \
- *     --query "standup comedy in russian" \
- *     --city "New York" \
- *     --days 90 \
- *     --search tavily \
- *     [--expand templates|llm] [--model <id>] [--max-results 20] [--force]
+ * Configure in [eval/config.js](../config.js) → `fetchSearch`. Run:
+ *   node --env-file=.env.dev eval/scripts/fetch-search.js
  */
 
 import { tavily } from '../../src/adapters/search/tavily.js';
 import { firecrawl } from '../../src/adapters/search/firecrawl.js';
 import { templates } from '../../src/strategies/queryExpansion/templates.js';
 import { llmExpand } from '../../src/strategies/queryExpansion/llmExpand.js';
-import { parseArgs, requireString, requireNumber, flag, requireEnv } from '../core/cli.js';
+import { requireEnv } from '../core/env.js';
 import { makeSlug } from '../core/slug.js';
 import { writeSearchFixture } from '../core/fixtures.js';
 import { buildExpandCtx } from '../core/ctx.js';
-import {DEFAULTS} from "../../src/index.js";
+import { config } from '../config.js';
 
-const args = parseArgs(process.argv.slice(2));
+const { query: queryText, city, days, search: which, expand, model, maxResults, force } = config.fetchSearch;
 
 try {
-  const queryText = requireString(args, 'query');
-  const city = requireString(args, 'city');
-  const days = requireNumber(args, 'days');
-  const which = requireString(args, 'search');
-  const maxResults = typeof args['max-results'] === 'string' ? Number(args['max-results']) : 20;
-  const force = flag(args, 'force');
-  const expand = typeof args.expand === 'string' ? args.expand : null;
-
   const adapter = buildSearchAdapter(which);
 
   const today = new Date();
@@ -56,7 +41,6 @@ try {
   let queries;
   if (expand) {
     const strategy = buildExpandStrategy(expand);
-    const model = typeof args.model === 'string' ? args.model : DEFAULTS.llm.model;
     const expandCtx = buildExpandCtx({
       query: { city, queryText, timeframe },
       ...(expand === 'llm' ? { apiKey: requireEnv('OPENAI_API_KEY'), model } : {}),
@@ -106,7 +90,7 @@ function buildSearchAdapter(name) {
     case 'firecrawl':
       return firecrawl({ apiKey: requireEnv('FIRECRAWL_API_KEY') });
     default:
-      throw new Error(`unknown --search ${name}; supported: tavily, firecrawl`);
+      throw new Error(`unknown search=${name} in config.fetchSearch; supported: tavily, firecrawl`);
   }
 }
 
@@ -121,7 +105,7 @@ function buildExpandStrategy(name) {
     case 'llm':
       return llmExpand();
     default:
-      throw new Error(`unknown --expand ${name}; supported: templates, llm`);
+      throw new Error(`unknown expand=${name} in config.fetchSearch; supported: templates, llm`);
   }
 }
 

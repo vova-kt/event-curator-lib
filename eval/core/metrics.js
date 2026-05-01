@@ -11,6 +11,7 @@
  */
 
 import { titleSimilarity, titleMatches, dateMatches, venueMatches } from './matching.js';
+import { detectExpectedLanguage } from './queryHeuristics.js';
 
 /**
  * @typedef {Object} GenericEvent
@@ -118,6 +119,178 @@ export function fieldAccuracy(r) {
     if (m.fields.venue) venue++;
   }
   return { n, date: date / n, venue: venue / n };
+}
+
+/**
+ * Token-Jaccard similarity between two strings, lowercased and split on
+ * non-alphanumeric runs. Tokens shorter than 2 chars are dropped so common
+ * filler ("a", "in") doesn't dominate. Used by query-expansion metrics
+ * (golden coverage, diversity) — kept here so all eval kinds share one
+ * tokenizer.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+export function queryJaccard(a, b) {
+  const A = tokenSet(a);
+  const B = tokenSet(b);
+  if (A.size === 0 && B.size === 0) return 0;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  const union = A.size + B.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
+/** @param {string} s */
+function tokenSet(s) {
+  return new Set(
+    s
+      .toLowerCase()
+      .split(/[^a-z0-9\u00c0-\u024f\u0400-\u04ff]+/i)
+      .filter((t) => t.length >= 2),
+  );
+}
+
+/**
+ * Coverage of a hand-curated set of "must-have" query phrasings: for each
+ * golden query, the best candidate match by token Jaccard above `threshold`
+ * counts as covered. Symmetric to `matchEvents` for the expansion eval.
+ *
+ * @param {string[]} golden
+ * @param {string[]} candidate
+ * @param {number} [threshold]
+ * @returns {{ matched: Array<{ goldenIdx: number, candidateIdx: number, score: number }>,
+ *             unmatchedGolden: number[],
+ *             goldenCount: number,
+ *             coverage: number }}
+ */
+export function goldenQueryCoverage(golden, candidate, threshold = 0.5) {
+  /** @type {Array<{ goldenIdx: number, candidateIdx: number, score: number }>} */
+  const matched = [];
+  const usedC = new Set();
+  for (let gi = 0; gi < golden.length; gi++) {
+    let bestCi = -1;
+    let bestScore = threshold;
+    for (let ci = 0; ci < candidate.length; ci++) {
+      if (usedC.has(ci)) continue;
+      const s = queryJaccard(golden[gi], candidate[ci]);
+      if (s >= bestScore) {
+        bestCi = ci;
+        bestScore = s;
+      }
+    }
+    if (bestCi !== -1) {
+      usedC.add(bestCi);
+      matched.push({ goldenIdx: gi, candidateIdx: bestCi, score: bestScore });
+    }
+  }
+  const matchedG = new Set(matched.map((m) => m.goldenIdx));
+  return {
+    matched,
+    unmatchedGolden: golden.map((_, i) => i).filter((i) => !matchedG.has(i)),
+    goldenCount: golden.length,
+    coverage: golden.length === 0 ? 0 : matched.length / golden.length,
+  };
+}
+
+/**
+ * Average pairwise token-Jaccard distance (1 - similarity). Higher means the
+ * expansion returned a more varied set; very low values flag near-duplicates
+ * the LLM didn't deduplicate itself.
+ *
+ * @param {string[]} queries
+ * @returns {{ pairs: number, avgDistance: number, minDistance: number }}
+ */
+export function queryDiversity(queries) {
+  if (queries.length < 2) return { pairs: 0, avgDistance: 0, minDistance: 0 };
+  let sum = 0;
+  let pairs = 0;
+  let min = 1;
+  for (let i = 0; i < queries.length; i++) {
+    for (let j = i + 1; j < queries.length; j++) {
+      const d = 1 - queryJaccard(queries[i], queries[j]);
+      sum += d;
+      pairs++;
+      if (d < min) min = d;
+    }
+  }
+  return { pairs, avgDistance: sum / pairs, minDistance: min };
+}
+
+/**
+ * Hard violations of the expandQueries prompt rules. Each violation is a
+ * concrete prompt-contract failure (>80 chars, boolean operators, quoted
+ * phrases, `site:` filter, exact duplicate) — the LLM should produce zero.
+ *
+ * @param {string[]} queries
+ * @returns {{ total: number,
+ *             tooLong: number[],
+ *             booleanOps: number[],
+ *             quoted: number[],
+ *             siteFilter: number[],
+ *             duplicates: number[] }}
+ */
+export function constraintCompliance(queries) {
+  const tooLong = [];
+  const booleanOps = [];
+  const quoted = [];
+  const siteFilter = [];
+  const duplicates = [];
+  const seen = new Map();
+  for (let i = 0; i < queries.length; i++) {
+    const q = queries[i];
+    if (q.length > 80) tooLong.push(i);
+    if (/\b(AND|OR|NOT)\b/.test(q) || /[+|]/.test(q)) booleanOps.push(i);
+    if (/["']/.test(q)) quoted.push(i);
+    if (/\bsite:/i.test(q)) siteFilter.push(i);
+    const norm = q.trim().toLowerCase();
+    if (seen.has(norm)) duplicates.push(i);
+    else seen.set(norm, i);
+  }
+  return {
+    total: queries.length,
+    tooLong,
+    booleanOps,
+    quoted,
+    siteFilter,
+    duplicates,
+  };
+}
+
+/**
+ * Fraction of candidate queries that look like one of the languages the
+ * city's audience speaks. Each query is classified via
+ * [queryHeuristics.detectExpectedLanguage](./queryHeuristics.js); the result
+ * is bucketed into `distribution[lang]` if it's in `expected`, otherwise
+ * counted as `unexpected`.
+ *
+ * @param {string[]} queries
+ * @param {string[]} expected  ISO 639-1 codes
+ * @returns {{ total: number, matched: number, coverage: number,
+ *             distribution: Record<string, number>, unexpected: number }}
+ */
+export function expectedLanguageCoverage(queries, expected) {
+  /** @type {Record<string, number>} */
+  const distribution = Object.fromEntries(expected.map((l) => [l, 0]));
+  let matched = 0;
+  let unexpected = 0;
+  for (const q of queries) {
+    const lang = detectExpectedLanguage(q, expected);
+    if (expected.includes(lang)) {
+      distribution[lang]++;
+      matched++;
+    } else {
+      unexpected++;
+    }
+  }
+  return {
+    total: queries.length,
+    matched,
+    coverage: queries.length === 0 ? 0 : matched / queries.length,
+    distribution,
+    unexpected,
+  };
 }
 
 /**

@@ -2,44 +2,42 @@
 
 Manual-only LLM eval pipelines. Outside the `test/**` glob, so `npm test` never runs them.
 
-The full reference is [docs/eval.md](../docs/eval.md). This file is a quickstart.
+In-tree conventions live in [CLAUDE.md](CLAUDE.md). Full design rationale in [docs/eval.md](../docs/eval.md). This file is a quickstart.
 
 ## Layout
 
-- `core/` — reusable across extract / rank / future evals
+- `core/` — reusable across extract / expand / future evals
 - `scripts/` — runnable CLIs
-- `fixtures/` — committed `<slug>.search.json` and `<slug>.golden.json`
+- `config.js` — single source of truth for script parameters
+- `fixtures/` — committed inputs and human-curated golden truth
 - `runs/` — gitignored per-run output
 
-## Quickstart: extraction eval
+## How to run
+
+Every script reads its parameters from [config.js](config.js); no CLI flags. Edit the relevant block, then:
 
 ```sh
-# 1. Fetch search results once. Commit the resulting fixture.
-TAVILY_API_KEY=... node eval/scripts/fetch-search.js \
-  --query "standup comedy in russian and english language" \
-  --city "berling" \
-  --days 90 \
-  --search tavily
-
-# 2. Run the LLM extraction against the fixture.
-OPENAI_API_KEY=... node eval/scripts/run-extract.js \
-  --fixture standup-comedy-in-russian__new-york__90d-from-2026-05-01 \
-  --model gpt-4o-mini
-
-# 3. Hand-curate the run output into a golden file. Commit it.
-#    (No automated bootstrapping — the golden is human truth.)
-
-# 4. Iterate on src/prompts/extractEvents.js, rerun step 2, watch metrics shift.
-
-# 5. When the new prompt is clearly better and you've reviewed false
-#    positives in the latest run, promote it:
-node eval/scripts/promote-golden.js \
-  --fixture standup-comedy-in-russian__new-york__90d-from-2026-05-01
+node --env-file=.env.dev eval/scripts/fetch-search.js
+node --env-file=.env.dev eval/scripts/run-extract.js
+node --env-file=.env.dev eval/scripts/run-expand.js
+node                     eval/scripts/promote-golden.js
 ```
 
-## Adding a new eval kind (e.g. ranking)
+`--env-file=.env.dev` populates `OPENAI_API_KEY` / `TAVILY_API_KEY` / etc. from your local dotenv at runtime.
 
-1. Add a script under `eval/scripts/run-<kind>.js`.
-2. Reuse `eval/core/{slug,fixtures,runs,matching,metrics,report,cli}.js`.
-3. Extend `eval/core/metrics.js` with kind-specific metrics if needed (e.g. `topKOverlap`, `rankCorrelation` for ranking).
-4. Use a distinct fixture suffix (`<slug>.events.json`, `<slug>.golden-rank.json`) and add helpers to `eval/core/fixtures.js`.
+## Extraction workflow
+
+1. Set `config.fetchSearch` and run `fetch-search.js` to write `eval/fixtures/<slug>.search.json` (commit it).
+2. Set `config.runExtract.fixture` to that slug and run `run-extract.js`. First run prints a bootstrap report — hand-curate the run JSON into `eval/fixtures/<slug>.golden.json` and commit.
+3. Iterate on [src/prompts/extractEvents.js](../src/prompts/extractEvents.js), rerun, compare metrics.
+4. Once a new prompt is clearly better, set `config.promoteGolden.fixture` and run `promote-golden.js` to copy the reviewed run's events into the golden file.
+
+## Query-expansion workflow
+
+1. Hand-author `eval/fixtures/<slug>.expand-input.json` with shape `{ slug, query: { city, queryText }, timeframe, limit?, nativeLanguageHints? }`.
+2. Set `config.runExpand.fixture` to that slug and run `run-expand.js`. First run prints metrics minus golden coverage — hand-pick the must-have phrasings into `eval/fixtures/<slug>.expand-golden.json` (`{ slug, queries: [...] }`) and commit.
+3. Iterate on [src/prompts/expandQueries.js](../src/prompts/expandQueries.js), rerun, compare metrics.
+
+## Adding a new eval kind
+
+See [CLAUDE.md → Adding a new eval kind](CLAUDE.md#adding-a-new-eval-kind).

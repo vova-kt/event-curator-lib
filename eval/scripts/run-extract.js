@@ -9,15 +9,16 @@
  * The eval calls the extract stage in isolation — no discover/dedupe/rank/
  * storage. See [src/stages/extract.js](../../src/stages/extract.js).
  *
- * Usage:
- *   node eval/scripts/run-extract.js --fixture <slug> [--model <id>] [--temperature 0]
+ * Configure in [eval/config.js](../config.js) → `runExtract`. Run:
+ *   node --env-file=.env.dev eval/scripts/run-extract.js
  */
 
 import { resolve } from 'node:path';
 import { extract } from '../../src/stages/extract.js';
-import { parseArgs, requireString, requireEnv } from '../core/cli.js';
+import { requireEnv } from '../core/env.js';
 import { loadSearchFixture, loadGoldenFixture } from '../core/fixtures.js';
 import { writeRun, gitShaOf } from '../core/runs.js';
+import { RunKind } from '../core/runKind.js';
 import { buildExtractCtx } from '../core/ctx.js';
 import {
   matchEvents,
@@ -26,14 +27,11 @@ import {
   hallucinationSignal,
 } from '../core/metrics.js';
 import { ratio, eventList, compose } from '../core/report.js';
+import { config } from '../config.js';
 
-const args = parseArgs(process.argv.slice(2));
+const { fixture: slug, model, temperature } = config.runExtract;
 
 try {
-  const slug = requireString(args, 'fixture');
-  const model = typeof args.model === 'string' ? args.model : 'gpt-4o-mini';
-  const temperature =
-    typeof args.temperature === 'string' ? Number(args.temperature) : 0;
   const apiKey = requireEnv('OPENAI_API_KEY');
 
   const fixture = loadSearchFixture(slug);
@@ -71,7 +69,7 @@ try {
 
   const runPath = writeRun({
     slug,
-    kind: 'extract',
+    kind: RunKind.EXTRACT,
     llm: { provider: 'openai', model, temperature },
     promptHashes: { 'extractEvents.js': gitShaOf(promptPath) },
     output: events,

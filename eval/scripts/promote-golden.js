@@ -10,31 +10,29 @@
  * Prints a diff summary against any existing golden so the change is
  * reviewable in the commit.
  *
- * Usage:
- *   node eval/scripts/promote-golden.js --fixture <slug>             # uses newest run
- *   node eval/scripts/promote-golden.js --fixture <slug> --run <path>
+ * Configure in [eval/config.js](../config.js) → `promoteGolden`. Run:
+ *   node eval/scripts/promote-golden.js
  */
 
-import { parseArgs, requireString } from '../core/cli.js';
 import { loadGoldenFixture, writeGoldenFixture } from '../core/fixtures.js';
 import { listRuns, loadRun } from '../core/runs.js';
+import { RunKind } from '../core/runKind.js';
 import { matchEvents } from '../core/metrics.js';
+import { config } from '../config.js';
 
-const args = parseArgs(process.argv.slice(2));
+const { fixture: slug, runPath: explicitRun } = config.promoteGolden;
 
 try {
-  const slug = requireString(args, 'fixture');
   const runPath =
-    typeof args.run === 'string'
-      ? args.run
-      : (() => {
-          const runs = listRuns(slug);
-          if (runs.length === 0) throw new Error(`no runs found for ${slug}`);
-          return runs[0];
-        })();
+    explicitRun ??
+    (() => {
+      const runs = listRuns(slug);
+      if (runs.length === 0) throw new Error(`no runs found for ${slug}`);
+      return runs[0];
+    })();
 
   const run = loadRun(runPath);
-  if (run.kind !== 'extract') {
+  if (run.kind !== RunKind.EXTRACT) {
     throw new Error(`run kind=${run.kind}; promote-golden currently supports extract only`);
   }
   const events = /** @type {import('../core/fixtures.js').GoldenEvent[]} */ (run.output);

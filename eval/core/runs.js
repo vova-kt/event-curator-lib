@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { execSync } from 'node:child_process';
+import { RunKind } from './runKind.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNS_DIR = resolve(HERE, '..', 'runs');
@@ -18,7 +19,7 @@ const RUNS_DIR = resolve(HERE, '..', 'runs');
 /**
  * @typedef {Object} RunRecord
  * @property {string} slug
- * @property {'extract' | 'rank'} kind
+ * @property {typeof RunKind[keyof typeof RunKind]} kind
  * @property {string} timestamp
  * @property {{ provider: string, model: string, temperature?: number }} llm
  * @property {Record<string, string>} promptHashes      // {[promptName]: git sha or content hash}

@@ -50,7 +50,7 @@ export async function createCurator(opts) {
   const logger = createLogger(config.logging.level, config.logging.file);
   const strategies = {
     queryExpansion: opts.strategies?.queryExpansion ?? [
-      llmExpand({ limit: config.queryExpansion.defaultLimit }),
+      llmExpand(),
       templates(),
     ],
     dedupe: opts.strategies?.dedupe ?? [byId, fuzzyTitle(config.dedupe.fuzzyTitleThreshold)],

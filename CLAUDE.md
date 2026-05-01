@@ -32,7 +32,7 @@ The `docs/` directory is the canonical reference. Read the page that matches you
 - [docs/preferences.md](docs/preferences.md) — how user signal turns into ranking input (state machine + derived traits)
 - [docs/examples.md](docs/examples.md) — running the script and CLI
 - [docs/env.md](docs/env.md) — env-var bindings for API keys and DB path
-- [docs/eval.md](docs/eval.md) — manual-only LLM eval pipelines for prompt iteration
+- [docs/eval.md](docs/eval.md) — manual-only LLM eval pipelines for prompt iteration. For in-tree gotchas see [eval/CLAUDE.md](eval/CLAUDE.md)
 - [docs/apps/tui.md](docs/apps/tui.md) — the TUI front-end (the only app today; web app planned). For in-tree gotchas see [app/tui/CLAUDE.md](app/tui/CLAUDE.md)
 
 ## Quick orientation
