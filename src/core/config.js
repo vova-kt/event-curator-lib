@@ -35,9 +35,15 @@ export const DEFAULTS = Object.freeze({
     /** Default model id passed to the adapter (e.g. an OpenAI / Anthropic model id). */
     model: 'gpt-5.4-mini',
     /** Sampling temperature. Low by default — prompts return JSON. */
-    temperature: 0.2,
+    temperature: 0.0,
     /** Max output tokens per call. Sized for the largest extract batches. */
-    maxTokens: 16000,
+    maxTokens: 16_000,
+    /** Max retries per LLM call on failure (e.g. truncated JSON, transient errors). */
+    maxRetries: 1,
+    /** Max estimated input tokens per extract LLM call. Hits are batched up to this cap. */
+    batchInputTokens: 10_000,
+    /** Token estimator: tokens ≈ ceil(chars / charsPerToken). */
+    charsPerToken: 4,
   },
 
   /** Defaults applied to every configured search adapter. */
@@ -55,11 +61,7 @@ export const DEFAULTS = Object.freeze({
     /** Look-ahead window (days) used when the caller asks for "upcoming" events without an explicit timeframe. */
     defaultRollingDays: 90,
     /** Worker-pool size for the extract stage's parallel LLM calls. */
-    extractConcurrency: 4,
-    /** Max estimated input tokens per extract LLM call. Hits are batched up to this cap. */
-    extractBatchTokenCap: 10_000,
-    /** Token estimator: tokens ≈ ceil(chars / charsPerToken). */
-    charsPerToken: 4,
+    maxWorkers: 4,
   },
 
   /** Tuning for the `llmExpand` query-expansion strategy. */
@@ -88,6 +90,17 @@ export const DEFAULTS = Object.freeze({
     deriveTraits: true,
     /** Re-derive `derivedTraits` after this many new liked/disliked events. */
     traitsRefreshThreshold: 5,
+  },
+
+  /** Score-dimension weights for computing a single overall relevancy score. */
+  scoring: {
+    weights: {
+      queryIntent: 0.3,
+      city: 0.1,
+      dates: 0.1,
+      languageIntent: 0.2,
+      quality: 0.3,
+    },
   },
 
   /** Core logger configuration. */

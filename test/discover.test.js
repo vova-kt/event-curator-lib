@@ -38,10 +38,11 @@ test('discover: dedupes queries from multiple strategies before fan-out', async 
   const a = () => ['Comedy Events in Berlin', 'standup Berlin'];
   const b = () => ['comedy events in berlin', 'open mic Berlin']; // first overlaps with a (case-insensitive)
 
-  await discover(makeCtx({ queryExpansion: [a, b], search: [search] }));
+  const { queries } = await discover(makeCtx({ queryExpansion: [a, b], search: [search] }));
 
   // Three distinct queries (case-insensitive), in insertion order, first-seen casing wins.
   assert.deepEqual(seen, ['Comedy Events in Berlin', 'standup Berlin', 'open mic Berlin']);
+  assert.deepEqual(queries, ['Comedy Events in Berlin', 'standup Berlin', 'open mic Berlin']);
 });
 
 test('discover: throws when queryExpansion is empty (misconfiguration)', async () => {
@@ -68,7 +69,7 @@ test('discover: collapses hits whose URLs differ only by tracking params, www, c
       return variants.map((url, i) => ({ url, title: `t${i}`, snippet: '', source: 'spy' }));
     },
   };
-  const hits = await discover(makeCtx({
+  const { hits } = await discover(makeCtx({
     queryExpansion: [() => ['q']],
     search: [search],
   }));
@@ -93,7 +94,7 @@ test('discover: preserves non-tracking query params and keeps the first-seen var
       ];
     },
   };
-  const hits = await discover(makeCtx({
+  const { hits } = await discover(makeCtx({
     queryExpansion: [() => ['q']],
     search: [search],
   }));
@@ -114,7 +115,7 @@ test('discover: unparseable URLs fall back to exact-match dedup', async () => {
       ];
     },
   };
-  const hits = await discover(makeCtx({
+  const { hits } = await discover(makeCtx({
     queryExpansion: [() => ['q']],
     search: [search],
   }));

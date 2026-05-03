@@ -35,16 +35,29 @@
  */
 
 /**
+ * @typedef {Object} EventScore
+ * @property {number} queryIntent   // 0–10 how well the event matches the query's vibe / intent
+ * @property {number} location      // 0–10 relevance to the queried location
+ * @property {number} dates         // 0–10 relevance to the queried timeframe
+ * @property {number?} languageIntent // 0–10 relevance to the requested language from the query
+ * @property {number} quality       // 0–10 quality score
+ */
+
+/**
  * @typedef {Object} Event
  * @property {string} id                 // canonical hash; see core/identity.js
  * @property {string} title
  * @property {string} [description]
- * @property {string} startsAt           // ISO 8601
+ * @property {string} startsAt           // ISO 8601 — earliest/primary occurrence
  * @property {string} [endsAt]           // ISO 8601
+ * @property {string[]} [occurrences]    // all dates (ISO 8601) for recurring events; includes startsAt
  * @property {Venue} venue
  * @property {EventSource} source
  * @property {EventPrice} [price]
- * @property {string} [rationale]        // LLM's "why this matches" line
+ * @property {string} [deduplicationKey] // strict: "artist, venue, dd-mm-yy" lowercase English
+ * @property {string} [reason]           // LLM's reasoning about relevancy score
+ * @property {EventScore} [score]        // multi-dimensional 0–10 relevancy scores
+ * @property {string} [rationale]        // rank-stage "why this matches" line
  * @property {string} [firstSeenAt]
  * @property {string} [lastSeenAt]
  * @property {string} [lastShownAt]      // most recent time any consumer transitioned this event to a user-visible state
@@ -146,6 +159,7 @@
  * @property {boolean} [json]
  * @property {number} [temperature]
  * @property {number} [maxTokens]
+ * @property {'low'|'medium'|'high'} [reasoningEffort]
  * @property {AbortSignal} [signal]
  */
 
@@ -220,14 +234,24 @@
  */
 
 /**
+ * @typedef {Object} ScoreWeights
+ * @property {number} queryIntent
+ * @property {number} city
+ * @property {number} dates
+ * @property {number} languageIntent
+ * @property {number} quality
+ */
+
+/**
  * @typedef {Object} Config
  * @property {boolean} dev
- * @property {{ model: string, temperature: number, maxTokens: number }} llm
+ * @property {{ model: string, temperature: number, maxTokens: number, maxRetries: number, batchInputTokens: number, charsPerToken: number }} llm
  * @property {{ maxResultsPerAdapter: number, timeoutMs: number }} search
- * @property {{ maxEvents: number, defaultRollingDays: number, extractConcurrency: number, extractBatchTokenCap: number, charsPerToken: number }} pipeline
+ * @property {{ maxEvents: number, defaultRollingDays: number, maxWorkers: number }} pipeline
  * @property {{ maxQueries: number, temperature: number, maxTokens: number }} queryExpansion
  * @property {{ fuzzyTitleThreshold: number }} dedupe
  * @property {{ deriveTraits: boolean, traitsRefreshThreshold: number }} preferences
+ * @property {{ weights: ScoreWeights }} scoring
  * @property {{ level: 'silent'|'error'|'warn'|'info'|'debug', file: string|null }} logging
  */
 

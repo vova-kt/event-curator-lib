@@ -8,7 +8,7 @@ import { ProgressStage, ProgressPhase } from '../core/progress.js';
 
 /**
  * @param {import('../core/types.js').Ctx} ctx
- * @returns {Promise<import('../core/types.js').SearchHit[]>}
+ * @returns {Promise<{ hits: import('../core/types.js').SearchHit[], queries: string[] }>}
  */
 export async function discover(ctx) {
   const emit = ctx.onProgress ?? (() => {});
@@ -48,7 +48,7 @@ export async function discover(ctx) {
   const deduped = dedupeByUrl(all);
   emit({ stage: ProgressStage.SEARCH, phase: ProgressPhase.DONE, count: deduped.length });
   log.debug(`[discover] ${all.length} raw hits → ${deduped.length} after url-dedupe`);
-  return deduped;
+  return { hits: deduped, queries };
 }
 
 /**

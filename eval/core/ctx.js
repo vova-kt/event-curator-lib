@@ -30,17 +30,32 @@ function withTemperature(llm, temperature) {
 }
 
 /**
+ * @param {import('../../src/core/types.js').LLMAdapter} llm
+ * @param {'low'|'medium'|'high'} effort
+ * @returns {import('../../src/core/types.js').LLMAdapter}
+ */
+function withReasoningEffort(llm, effort) {
+  return {
+    name: llm.name,
+    model: llm.model,
+    chat: (req) => llm.chat({ ...req, reasoningEffort: req.reasoningEffort ?? effort }),
+  };
+}
+
+/**
  * @param {{
  *   query: { city: string, queryText: string, timeframe: { from: string, to: string } },
  *   model: string,
  *   apiKey: string,
  *   temperature?: number,
+ *   reasoningEffort?: 'low'|'medium'|'high',
  *   logLevel?: string,
  * }} opts
  */
-export function buildExtractCtx({ query, model, apiKey, temperature = 0, logLevel = LogLevel.WARN }) {
+export function buildExtractCtx({ query, model, apiKey, temperature = 0, reasoningEffort, logLevel = LogLevel.WARN }) {
   const baseLlm = openai({ apiKey, model });
-  const llm = withTemperature(baseLlm, temperature);
+  let llm = withTemperature(baseLlm, temperature);
+  if (reasoningEffort) llm = withReasoningEffort(llm, reasoningEffort);
   const config = mergeConfig(DEFAULTS, { llm: { model }, logging: { level: logLevel, file: null } });
   const logger = createLogger(logLevel, null);
   return {

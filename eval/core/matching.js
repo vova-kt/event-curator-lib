@@ -5,6 +5,7 @@
  * its own module so a future ranking eval can reuse the same comparators.
  */
 
+const DEDUP_KEY_JACCARD_THRESHOLD = 0.5;
 const TITLE_JACCARD_THRESHOLD = 0.5;
 const DATE_TOLERANCE_DAYS = 1;
 
@@ -28,6 +29,28 @@ export function titleSimilarity(a, b) {
  */
 export function titleMatches(a, b) {
   return titleSimilarity(a, b) >= TITLE_JACCARD_THRESHOLD;
+}
+
+/**
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} Jaccard similarity over normalized tokens, in [0, 1].
+ */
+export function dedupKeySimilarity(a, b) {
+  const ta = tokenize(a);
+  const tb = tokenize(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  return inter / (ta.size + tb.size - inter);
+}
+
+/**
+ * @param {string} a
+ * @param {string} b
+ */
+export function dedupKeyMatches(a, b) {
+  return dedupKeySimilarity(a, b) >= DEDUP_KEY_JACCARD_THRESHOLD;
 }
 
 /**
@@ -60,13 +83,13 @@ export function venueMatches(a, b) {
  * @param {string} s
  * @returns {Set<string>}
  */
-function tokenize(s) {
+export function tokenize(s) {
   return new Set(
     s
       .toLowerCase()
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/[^\p{Letter}\p{Number}\s]+/gu, ' ')
       .split(/\s+/)
       .filter((t) => t.length >= 2),
   );
@@ -75,13 +98,13 @@ function tokenize(s) {
 /**
  * @param {string} s
  */
-function normalizeVenue(s) {
+export function normalizeVenue(s) {
   return s
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\b(the|a|an)\b/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
     .trim();
 }
 

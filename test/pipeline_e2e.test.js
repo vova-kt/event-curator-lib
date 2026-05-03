@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createCurator, EventState } from '../src/index.js';
 import { memory } from '../src/adapters/storage/memory.js';
 import { templates } from '../src/strategies/queryExpansion/index.js';
-import { stubLLM, stubSearch } from './_helpers.js';
+import { stubLLM, stubSearch, futureDate } from './_helpers.js';
 
 // These tests focus on dedupe / feedback wiring, not query expansion. Use the
 // deterministic `templates` strategy so they don't depend on stubbed LLM calls
@@ -19,7 +19,7 @@ test('createCurator: full pipeline returns events from stub adapters', async () 
         events: [
           {
             title: 'Test Comedy Night',
-            startsAt: '2026-05-02T20:00:00+00:00',
+            startsAt: futureDate(),
             venue: { name: 'Test Café', city: 'Berlin' },
             source: { name: 'stub', url: 'https://example.com/listing' },
           },
@@ -37,7 +37,7 @@ test('createCurator: full pipeline returns events from stub adapters', async () 
   }]);
   const storage = memory();
 
-  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion });
+  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion, config: { logging: { file: null } } });
   const { events } = await curator.curate({
     city: 'Berlin',
     queryText: 'comedy',
@@ -57,7 +57,7 @@ test('createCurator: cross-session dedupe only drops events the consumer marked 
       events: [
         {
           title: 'Same Event Twice',
-          startsAt: '2026-05-02T20:00:00+00:00',
+          startsAt: futureDate(),
           venue: { name: 'Café', city: 'Berlin' },
           source: { name: 'stub', url: 'https://x.example.com' },
         },
@@ -66,7 +66,7 @@ test('createCurator: cross-session dedupe only drops events the consumer marked 
   });
   const search = stubSearch([{ url: 'https://x.example.com', title: 't', content: 'c', source: 'stub' }]);
   const storage = memory();
-  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion });
+  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion, config: { logging: { file: null } } });
 
   const first = await curator.curate({
     city: 'Berlin',
@@ -103,7 +103,7 @@ test('createCurator: listShown returns previously shown events for a saved query
     events: [
       {
         title: 'Listed',
-        startsAt: '2026-05-02T20:00:00+00:00',
+        startsAt: futureDate(),
         venue: { name: 'V', city: 'Berlin' },
         source: { name: 'stub', url: 'https://x.example.com' },
       },
@@ -111,7 +111,7 @@ test('createCurator: listShown returns previously shown events for a saved query
   }));
   const search = stubSearch([{ url: 'https://x.example.com', title: 't', content: 'c', source: 'stub' }]);
   const storage = memory();
-  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion });
+  const curator = await createCurator({ llm, search: [search], storage, strategies: deterministicExpansion, config: { logging: { file: null } } });
 
   const { events } = await curator.curate({
     city: 'Berlin', queryText: 'comedy', timeframe: { rolling: { days: 14 } },
@@ -134,7 +134,7 @@ test('createCurator: recordFeedback persists likes per saved query and refreshes
     if (req.system.includes('extract structured upcoming events')) {
       return {
         events: [
-          { title: 'A', startsAt: '2026-05-02T20:00:00+00:00', venue: { name: 'V', city: 'Berlin' }, source: { name: 'stub', url: 'https://x.example.com' } },
+          { title: 'A', startsAt: futureDate(), venue: { name: 'V', city: 'Berlin' }, source: { name: 'stub', url: 'https://x.example.com' } },
         ],
       };
     }
@@ -153,7 +153,7 @@ test('createCurator: recordFeedback persists likes per saved query and refreshes
   });
   const curator = await createCurator({
     llm, search: [search], storage, strategies: deterministicExpansion,
-    config: { preferences: { traitsRefreshThreshold: 1, deriveTraits: true } },
+    config: { logging: { file: null }, preferences: { traitsRefreshThreshold: 1, deriveTraits: true } },
   });
 
   const { events } = await curator.curate({ city: 'Berlin', queryText: 'comedy', timeframe: { rolling: { days: 14 } } });

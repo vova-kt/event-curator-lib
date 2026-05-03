@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import { createCurator, EventState, llmRank, rules } from '../../src/index.js';
+import { createCurator, DEFAULTS, EventState, llmRank, rules } from '../../src/index.js';
 import { sqlite } from '../../src/adapters/storage/sqlite.js';
 import { memory } from '../../src/adapters/storage/memory.js';
 import { openai } from '../../src/adapters/llm/openai.js';
@@ -88,7 +88,7 @@ export default function App({ dry, logFile }) {
   const buildCurator = async (keys) => {
     const llm = dry
       ? stubLLM()
-      : openai({ apiKey: keys.openaiApiKey, model: keys.openaiModel });
+      : openai({ apiKey: keys.openaiApiKey, model: keys.openaiModel, maxRetries: DEFAULTS.llm.maxRetries });
     const search = dry ? [stubSearch()] : [tavily({ apiKey: keys.tavilyApiKey })];
     const storage = dry ? memory() : sqlite({ path: keys.dbPath });
     // The TUI opts into LLM rank so saved-query guidance and 5-word

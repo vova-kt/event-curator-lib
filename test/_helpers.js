@@ -9,13 +9,24 @@ import { createLogger } from '../src/core/logger.js';
 export const silentLogger = createLogger('silent');
 
 /**
+ * ISO datetime 7 days from now — keeps fixtures inside rolling windows.
+ * @returns {string}
+ */
+export function futureDate() {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 7);
+  d.setUTCHours(20, 0, 0, 0);
+  return d.toISOString().replace('.000Z', '+00:00');
+}
+
+/**
  * @param {Partial<import('../src/core/types.js').Event>} overrides
  * @returns {import('../src/core/types.js').Event}
  */
 export function makeEvent(overrides = {}) {
   const base = {
     title: 'Sample Event',
-    startsAt: '2026-05-02T20:00:00+00:00',
+    startsAt: futureDate(),
     venue: { name: 'The Venue', city: 'Berlin' },
     source: { name: 'stub', url: 'https://example.com/sample' },
   };

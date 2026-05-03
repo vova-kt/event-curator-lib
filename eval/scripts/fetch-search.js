@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * fetch-search.js — manual one-shot.
+ * fetch-search.js — batch search fixture generator.
  *
- * Runs a real search adapter against one or more queries and writes the results
- * to `eval/fixtures/<slug>.search.json`. The fixture freezes the timeframe and
- * query parameters so downstream eval scripts (run-extract, future run-rank)
- * are reproducible without re-hitting the search API.
+ * Runs a real search adapter against one or more (query, city) pairs and writes
+ * results to `eval/fixtures/search/<slug>.search.json`. Each fixture freezes the
+ * timeframe and query parameters so downstream eval scripts (run-extract,
+ * future run-rank) are reproducible without re-hitting the search API.
  *
  * With `expand: null`, a single literal "<query> <city>" search is issued.
  * `expand: 'templates'` fans out via 4 deterministic phrasings (no LLM).
  * `expand: 'llm'` uses llmExpand (requires OPENAI_API_KEY). Results across
  * all queries are merged and deduplicated by URL before writing the fixture.
  *
- * Configure in [eval/config.js](../config.js) → `fetchSearch`. Run:
+ * Configure the `shared` and `queries` blocks below, then run:
  *   node --env-file=.env.dev eval/scripts/fetch-search.js
  */
 
@@ -23,12 +23,11 @@ import { requireEnv } from '../core/env.js';
 import { makeSlug } from '../core/slug.js';
 import { writeSearchFixture } from '../core/fixtures.js';
 import { buildExpandCtx } from '../core/ctx.js';
-import {DEFAULTS} from "../../src/index.js";
-import {dedupeByUrl} from '../../src/stages/discover.js'
+import { DEFAULTS } from '../../src/index.js';
+import { dedupeByUrl } from '../../src/stages/discover.js';
 
-const config = {
-  query: 'standup comedy in Russian',
-  city: 'Berlin',
+/** Shared settings applied to every query. */
+const shared = {
   days: 90,
   /** @type {'tavily' | 'firecrawl'} */
   searchProvider: 'tavily',
@@ -42,60 +41,85 @@ const config = {
   /** Used only when expand === 'llm'. */
   model: DEFAULTS.llm.model,
   maxResults: 20,
-  /** Overwrite an existing <slug>.search.json. */
+  /** Overwrite existing <slug>.search.json files. */
   force: false,
-}
+};
 
-try {
-  const adapter = buildSearchAdapter(config.searchProvider);
+/** Each entry produces one <slug>.search.json fixture. */
+const queries = [
+  { query: 'standup comedy in Russian', city: 'Berlin' },
+  { query: 'jazz concert',              city: 'New York' },
+  { query: 'tech meetup AI',            city: 'San Francisco' },
+  { query: 'salsa bachata social',      city: 'Barcelona' },
+  { query: 'indie film screening',      city: 'Amsterdam' },
+  { query: 'yoga retreat weekend',      city: 'Lisbon' },
+  { query: 'startup pitch night',       city: 'London' },
+  { query: 'contemporary art exhibition', city: 'Paris' },
+];
 
-  const today = new Date();
-  const to = new Date(today);
-  to.setUTCDate(to.getUTCDate() + config.days);
-  const timeframe = { from: isoDate(today), to: isoDate(to) };
+// ── run ─────────────────────────────────────────────────────────────────
 
-  const slug = makeSlug({
-      queryText: config.query,
-      city: config.city,
-      days: config.days,
-      from: timeframe.from
-  });
+const adapter = buildSearchAdapter(shared.searchProvider);
+const expandStrategy = shared.expand ? buildExpandStrategy(shared.expand) : null;
 
-  let queries;
-  if (config.expand) {
-    const strategy = buildExpandStrategy(config.expand);
-    const expandCtx = buildExpandCtx({
-      query: { city: config.city, queryText: config.query, timeframe },
-      ...(config.expand === 'llm' ? { apiKey: requireEnv('OPENAI_API_KEY'), model: config.model } : {}),
-    });
-    queries = await strategy(expandCtx);
-    console.log(`expanded to ${queries.length} queries via ${config.expand}`);
-  } else {
-    queries = [`${config.queryText} ${config.city}`];
+const today = new Date();
+const to = new Date(today);
+to.setUTCDate(to.getUTCDate() + shared.days);
+const timeframe = { from: isoDate(today), to: isoDate(to) };
+
+let ok = 0;
+let fail = 0;
+
+for (const { query, city } of queries) {
+  const i = ok + fail + 1;
+  const label = `"${query}" in ${city}`;
+  try {
+    const slug = makeSlug({ queryText: query, city, days: shared.days, from: timeframe.from });
+
+    let searchQueries;
+    if (expandStrategy) {
+      const expandCtx = buildExpandCtx({
+        query: { city, queryText: query, timeframe },
+        ...(shared.expand === 'llm' ? { apiKey: requireEnv('OPENAI_API_KEY'), model: shared.model } : {}),
+      });
+      searchQueries = await expandStrategy(expandCtx);
+      console.log(`[${i}/${queries.length}] ${label}: expanded to ${searchQueries.length} queries via ${shared.expand}`);
+    } else {
+      searchQueries = [`${query} ${city}`];
+      console.log(`[${i}/${queries.length}] ${label}: 1 literal query`);
+    }
+
+    console.log(`  fetching: ${searchQueries.length} queries × max ${shared.maxResults}`);
+    const allHitsArrays = await Promise.all(
+      searchQueries.map((q) => adapter.search(q, { maxResults: shared.maxResults })),
+    );
+    const allHits = allHitsArrays.flat();
+    const hits = dedupeByUrl(allHits);
+    console.log(`  total ${allHits.length} → deduped ${hits.length}`);
+
+    const path = writeSearchFixture(
+      {
+        slug,
+        query: { city, queryText: query },
+        timeframe,
+        fetchedAt: new Date().toISOString(),
+        search: { adapter: shared.searchProvider, queries: searchQueries },
+        hits,
+      },
+      { force: shared.force },
+    );
+    console.log(`  wrote ${path}\n`);
+    ok++;
+  } catch (err) {
+    console.error(`  FAILED ${label}: ${err instanceof Error ? err.message : err}\n`);
+    fail++;
   }
-
-  console.log(`fetching: adapter=${config.searchProvider} queries=${queries.length} max=${config.maxResults}`);
-  const allHitsArrays = await Promise.all(queries.map((q) => adapter.search(q, { maxResults: config.maxResults })));
-  const allHits = allHitsArrays.flat()
-  const hits = dedupeByUrl(allHits)
-  console.log(`total hits ${allHits.length}, deduped to ${hits.length}`);
-
-  const path = writeSearchFixture(
-    {
-      slug,
-      query: { city: config.city, queryText: config.query },
-      timeframe,
-      fetchedAt: new Date().toISOString(),
-      search: { adapter: config.searchProvider, queries },
-      hits,
-    },
-    { force: config.force },
-  );
-  console.log(`wrote ${path}`);
-} catch (err) {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
 }
+
+console.log(`done: ${ok} ok, ${fail} failed out of ${queries.length}`);
+if (fail > 0) process.exit(1);
+
+// ── helpers ─────────────────────────────────────────────────────────────
 
 /**
  * @param {string} name
@@ -108,7 +132,7 @@ function buildSearchAdapter(name) {
     case 'firecrawl':
       return firecrawl({ apiKey: requireEnv('FIRECRAWL_API_KEY') });
     default:
-      throw new Error(`unknown search=${name} in config.fetchSearch; supported: tavily, firecrawl`);
+      throw new Error(`unknown search=${name}; supported: tavily, firecrawl`);
   }
 }
 
@@ -123,7 +147,7 @@ function buildExpandStrategy(name) {
     case 'llm':
       return llmExpand();
     default:
-      throw new Error(`unknown expand=${name} in config.fetchSearch; supported: templates, llm`);
+      throw new Error(`unknown expand=${name}; supported: templates, llm`);
   }
 }
 

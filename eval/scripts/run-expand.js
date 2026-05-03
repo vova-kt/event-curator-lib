@@ -213,7 +213,7 @@ try {
       if (!r.golden) {
         console.log(
           `\nno golden file yet. Hand-curate a list of must-have phrasings, save as ` +
-            `eval/fixtures/${r.slug}.expand-golden.json with shape ` +
+            `eval/fixtures/expand/${r.slug}.expand-golden.json with shape ` +
             `{ "slug": "${r.slug}", "queries": [...] }.`,
         );
       }

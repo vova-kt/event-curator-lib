@@ -2,7 +2,7 @@
 /**
  * promote-golden.js
  *
- * Copies a reviewed run's events to `eval/fixtures/<slug>.golden.json`. The
+ * Copies a reviewed run's events to `eval/fixtures/extract/<slug>.golden.json`. The
  * golden is human-curated truth, not the first run's raw output — promote
  * AFTER manually editing the run JSON to remove false positives, fix dates,
  * and add events the LLM missed.

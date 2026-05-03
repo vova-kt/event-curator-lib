@@ -2,14 +2,15 @@
  * Fixture I/O for eval pipelines. Everything goes through this module so the
  * on-disk format stays consistent across extract, rank, and any future eval.
  *
- * - `<slug>.search.json` — committed search snapshot, self-describing
- * - `<slug>.golden.json` — committed human-curated truth
+ * - `search/<slug>.search.json` — committed search snapshot, self-describing
+ * - `extract/<slug>.golden.json` — committed human-curated truth
+ * - `expand/<slug>.expand-golden.json` — committed expand truth
  *
  * Paths resolve relative to `eval/fixtures/`, computed from this file's
  * location so the scripts work regardless of cwd.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -58,24 +59,36 @@ const FIXTURES_DIR = resolve(HERE, '..', 'fixtures');
  * @property {string[]} queries
  */
 
+/**
+ * @returns {string[]} slugs for all `*.search.json` files in the fixtures dir
+ */
+export function listSearchSlugs() {
+  const dir = resolve(FIXTURES_DIR, 'search');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.search.json'))
+    .map((f) => f.replace(/\.search\.json$/, ''))
+    .sort();
+}
+
 /** @param {string} slug */
 export function searchFixturePath(slug) {
-  return resolve(FIXTURES_DIR, `${slug}.search.json`);
+  return resolve(FIXTURES_DIR, 'search', `${slug}.search.json`);
 }
 
 /** @param {string} slug */
 export function goldenFixturePath(slug) {
-  return resolve(FIXTURES_DIR, `${slug}.golden.json`);
+  return resolve(FIXTURES_DIR, 'extract', `${slug}.golden.json`);
 }
 
 /** @param {string} slug */
 export function expandInputFixturePath(slug) {
-  return resolve(FIXTURES_DIR, `${slug}.expand-input.json`);
+  return resolve(FIXTURES_DIR, 'expand', `${slug}.expand-input.json`);
 }
 
 /** @param {string} slug */
 export function expandGoldenFixturePath(slug) {
-  return resolve(FIXTURES_DIR, `${slug}.expand-golden.json`);
+  return resolve(FIXTURES_DIR, 'expand', `${slug}.expand-golden.json`);
 }
 
 /**
@@ -103,8 +116,8 @@ export function loadGoldenFixture(slug) {
  * @param {{ force?: boolean }} [opts]
  */
 export function writeSearchFixture(fixture, opts = {}) {
-  ensureDir(FIXTURES_DIR);
   const path = searchFixturePath(fixture.slug);
+  ensureDir(dirname(path));
   if (existsSync(path) && !opts.force) {
     throw new Error(`fixture already exists: ${path}\n  pass --force to overwrite`);
   }
@@ -116,8 +129,8 @@ export function writeSearchFixture(fixture, opts = {}) {
  * @param {GoldenFixture} fixture
  */
 export function writeGoldenFixture(fixture) {
-  ensureDir(FIXTURES_DIR);
   const path = goldenFixturePath(fixture.slug);
+  ensureDir(dirname(path));
   writeFileSync(path, JSON.stringify(fixture, null, 2) + '\n');
   return path;
 }

@@ -21,7 +21,7 @@ const dry = args.dry === 'true' || args.dry === '';
 
 const llm = dry
   ? stubLLM()
-  : openai({ apiKey: requireEnv('OPENAI_API_KEY'), model: process.env.OPENAI_MODEL ?? DEFAULTS.llm.model });
+  : openai({ apiKey: requireEnv('OPENAI_API_KEY'), model: process.env.OPENAI_MODEL ?? DEFAULTS.llm.model, maxRetries: DEFAULTS.llm.maxRetries });
 
 const search = dry ? [stubSearch()] : [tavily({ apiKey: requireEnv('TAVILY_API_KEY') })];
 

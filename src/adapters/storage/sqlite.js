@@ -19,6 +19,7 @@ const SCHEMA = `
     venue_json TEXT NOT NULL,
     source_json TEXT NOT NULL,
     price_json TEXT,
+    occurrences_json TEXT,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
     last_shown_at TEXT
@@ -95,11 +96,11 @@ export function sqlite({ path }) {
       const stmt = d.prepare(`
         INSERT INTO events (
           id, title, description, starts_at, ends_at, city,
-          venue_json, source_json, price_json,
+          venue_json, source_json, price_json, occurrences_json,
           first_seen_at, last_seen_at, last_shown_at
         ) VALUES (
           @id, @title, @description, @starts_at, @ends_at, @city,
-          @venue_json, @source_json, @price_json,
+          @venue_json, @source_json, @price_json, @occurrences_json,
           @first_seen_at, @last_seen_at, @last_shown_at
         )
         ON CONFLICT(id) DO UPDATE SET
@@ -110,6 +111,7 @@ export function sqlite({ path }) {
           venue_json = excluded.venue_json,
           source_json = excluded.source_json,
           price_json = excluded.price_json,
+          occurrences_json = excluded.occurrences_json,
           last_seen_at = excluded.last_seen_at
       `);
       const tx = d.transaction((rows) => {
@@ -304,6 +306,7 @@ export function sqlite({ path }) {
  * @property {string} venue_json
  * @property {string} source_json
  * @property {string|null} price_json
+ * @property {string|null} occurrences_json
  * @property {string} first_seen_at
  * @property {string} last_seen_at
  * @property {string|null} last_shown_at
@@ -324,6 +327,7 @@ function eventToRow(e, now) {
     venue_json: JSON.stringify(e.venue),
     source_json: JSON.stringify(e.source),
     price_json: e.price ? JSON.stringify(e.price) : null,
+    occurrences_json: e.occurrences ? JSON.stringify(e.occurrences) : null,
     first_seen_at: e.firstSeenAt ?? now,
     last_seen_at: now,
     last_shown_at: e.lastShownAt ?? null,
@@ -344,6 +348,7 @@ function rowToEvent(row) {
     venue: JSON.parse(row.venue_json),
     source: JSON.parse(row.source_json),
     price: row.price_json ? JSON.parse(row.price_json) : undefined,
+    occurrences: row.occurrences_json ? JSON.parse(row.occurrences_json) : undefined,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
     lastShownAt: row.last_shown_at ?? undefined,

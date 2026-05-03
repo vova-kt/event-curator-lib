@@ -20,7 +20,7 @@ eval/
   core/        # reusable across eval kinds (slug, fixtures, runs, runKind, matching, metrics, report, ctx, env)
   scripts/     # CLIs: fetch-search, run-extract, run-expand, promote-golden
   config.js    # parameters per script
-  fixtures/    # committed
+  fixtures/    # committed; subfolders per eval kind (search/, extract/, expand/)
   runs/        # gitignored
 ```
 
@@ -59,7 +59,7 @@ Edit the relevant block in [eval/config.js](../eval/config.js) before each step.
    ```sh
    node --env-file=.env.dev eval/scripts/run-extract.js
    ```
-3. **First time**: hand-curate the run JSON into `eval/fixtures/<slug>.golden.json`, commit. Subsequent runs compare against it.
+3. **First time**: hand-curate the run JSON into `eval/fixtures/extract/<slug>.golden.json`, commit. Subsequent runs compare against it.
 4. **Iterate** on [src/prompts/extractEvents.js](../src/prompts/extractEvents.js), rerun step 2.
 5. **Promote** a reviewed run to the new golden once the change is clearly better. Set `config.promoteGolden.fixture`.
    ```sh

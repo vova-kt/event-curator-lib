@@ -20,11 +20,11 @@ export async function runCuration(ctx) {
   log.info(`[pipeline] start city="${ctx.query.city}" query="${ctx.query.queryText}"`);
   log.debug('[pipeline] query', ctx.query);
 
-  const hits = await discover(ctx);
+  const { hits, queries } = await discover(ctx);
   log.info(`[pipeline] discover → ${hits.length} hits`);
 
   emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.START, total: hits.length });
-  let events = await extract(hits, ctx);
+  let events = await extract(hits, ctx, { expandedQueries: queries });
   emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.DONE, count: events.length });
   log.info(`[pipeline] extract → ${events.length} events`);
 

@@ -51,7 +51,7 @@ test('llmExpand: caps result to limit and persists to KV', async () => {
   });
   const storage = memory();
   await storage.init();
-  const ctx = makeCtx({ llm, storage });
+  const ctx = makeCtx({ llm, storage, config: { queryExpansion: { maxQueries: 3 } } });
 
   const out = await llmExpand()(ctx);
   assert.equal(out.length, 3);
@@ -121,7 +121,7 @@ test('llmExpand: defaultLimit comes from config when not overridden', async () =
   const llm = stubLLM(() => ({ queries }));
   const storage = memory();
   await storage.init();
-  const ctx = makeCtx({ llm, storage, config: { queryExpansion: { defaultLimit: 5 } } });
+  const ctx = makeCtx({ llm, storage, config: { queryExpansion: { maxQueries: 5 } } });
 
   const out = await llmExpand()(ctx);
   assert.equal(out.length, 5);

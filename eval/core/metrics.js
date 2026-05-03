@@ -1,21 +1,23 @@
 /**
  * Generic event-set comparison metrics. Reusable across extract and rank evals.
  *
- * `matchEvents` pairs golden ↔ candidate by best title Jaccard above the
- * matching.js threshold, breaking ties by date proximity. Each candidate is
- * matched at most once. The result is a structural diff that downstream
- * helpers (`precisionRecall`, `fieldAccuracy`) compute scalar metrics from.
+ * `matchEvents` pairs golden ↔ candidate by deduplicationKey: first an exact
+ * match pass, then a Jaccard-similarity fallback for keys that are close but
+ * not identical. Each candidate is matched at most once. The result is a
+ * structural diff that downstream helpers (`precisionRecall`, `fieldAccuracy`)
+ * compute scalar metrics from.
  *
  * Hallucination signal is computed separately because it requires the source
  * pages, which `matchEvents` doesn't take.
  */
 
-import { titleSimilarity, titleMatches, dateMatches, venueMatches } from './matching.js';
+import { titleSimilarity, titleMatches, dedupKeySimilarity, dedupKeyMatches, dateMatches, venueMatches } from './matching.js';
 import { detectExpectedLanguage } from './queryHeuristics.js';
 
 /**
  * @typedef {Object} GenericEvent
  * @property {string} title
+ * @property {string} [deduplicationKey]
  * @property {string} startsAt
  * @property {{ name: string, city?: string }} venue
  * @property {{ free?: boolean }} [price]
@@ -26,7 +28,7 @@ import { detectExpectedLanguage } from './queryHeuristics.js';
  * @property {number} goldenIdx
  * @property {number} candidateIdx
  * @property {number} score                          // title Jaccard
- * @property {{ title: boolean, date: boolean, venue: boolean }} fields
+ * @property {{ dedupKey: boolean, title: boolean, date: boolean, venue: boolean }} fields
  */
 
 /**
@@ -45,34 +47,64 @@ export function matchEvents(golden, candidate) {
   /** @type {MatchPair[]} */
   const matched = [];
   const usedC = new Set();
+  const matchedG = new Set();
 
+  // Pass 0: exact deduplicationKey match (highest confidence).
   for (let gi = 0; gi < golden.length; gi++) {
-    const g = golden[gi];
-    let bestCi = -1;
-    let bestScore = 0;
-    let bestDateOk = false;
+    const gKey = golden[gi].deduplicationKey;
+    if (!gKey) continue;
     for (let ci = 0; ci < candidate.length; ci++) {
       if (usedC.has(ci)) continue;
+      const cKey = candidate[ci].deduplicationKey;
+      if (!cKey || gKey !== cKey) continue;
+      const g = golden[gi];
       const c = candidate[ci];
-      const score = titleSimilarity(g.title, c.title);
-      if (!titleMatches(g.title, c.title)) continue;
-      const dateOk = dateMatches(g.startsAt, c.startsAt);
-      // Prefer higher title score; break ties by date match.
-      if (score > bestScore || (score === bestScore && dateOk && !bestDateOk)) {
+      usedC.add(ci);
+      matchedG.add(gi);
+      matched.push({
+        goldenIdx: gi,
+        candidateIdx: ci,
+        score: titleSimilarity(g.title, c.title),
+        fields: {
+          dedupKey: true,
+          title: titleMatches(g.title, c.title),
+          date: dateMatches(g.startsAt, c.startsAt),
+          venue: venueMatches(g.venue?.name, c.venue?.name),
+        },
+      });
+      break;
+    }
+  }
+
+  // Pass 1: fuzzy deduplicationKey match (Jaccard above threshold).
+  for (let gi = 0; gi < golden.length; gi++) {
+    if (matchedG.has(gi)) continue;
+    const gKey = golden[gi].deduplicationKey;
+    if (!gKey) continue;
+    let bestCi = -1;
+    let bestScore = 0;
+    for (let ci = 0; ci < candidate.length; ci++) {
+      if (usedC.has(ci)) continue;
+      const cKey = candidate[ci].deduplicationKey;
+      if (!cKey || !dedupKeyMatches(gKey, cKey)) continue;
+      const score = dedupKeySimilarity(gKey, cKey);
+      if (score > bestScore) {
         bestCi = ci;
         bestScore = score;
-        bestDateOk = dateOk;
       }
     }
     if (bestCi !== -1) {
+      const g = golden[gi];
       const c = candidate[bestCi];
       usedC.add(bestCi);
+      matchedG.add(gi);
       matched.push({
         goldenIdx: gi,
         candidateIdx: bestCi,
-        score: bestScore,
+        score: titleSimilarity(g.title, c.title),
         fields: {
-          title: true,
+          dedupKey: false,
+          title: titleMatches(g.title, c.title),
           date: dateMatches(g.startsAt, c.startsAt),
           venue: venueMatches(g.venue?.name, c.venue?.name),
         },
@@ -80,12 +112,10 @@ export function matchEvents(golden, candidate) {
     }
   }
 
-  const matchedG = new Set(matched.map((m) => m.goldenIdx));
-  const matchedC = new Set(matched.map((m) => m.candidateIdx));
   return {
     matched,
     unmatchedGolden: golden.map((_, i) => i).filter((i) => !matchedG.has(i)),
-    unmatchedCandidate: candidate.map((_, i) => i).filter((i) => !matchedC.has(i)),
+    unmatchedCandidate: candidate.map((_, i) => i).filter((i) => !usedC.has(i)),
   };
 }
 
@@ -294,6 +324,71 @@ export function expectedLanguageCoverage(queries, expected) {
 }
 
 /**
+ * Score-agreement metrics between two parallel arrays of numbers (one per
+ * matched golden↔candidate pair). Returns Spearman rank correlation, Pearson
+ * correlation, and mean absolute error. With fewer than 3 pairs, correlation
+ * is undefined — returns `null` for those fields.
+ *
+ * @param {number[]} golden
+ * @param {number[]} candidate
+ * @returns {{ spearman: number | null, pearson: number | null, mae: number, n: number }}
+ */
+export function scoreCorrelation(golden, candidate) {
+  const n = golden.length;
+  if (n === 0) return { spearman: null, pearson: null, mae: 0, n: 0 };
+
+  let maeSum = 0;
+  for (let i = 0; i < n; i++) maeSum += Math.abs(golden[i] - candidate[i]);
+  const mae = maeSum / n;
+
+  if (n < 3) return { spearman: null, pearson: null, mae, n };
+
+  const pearson = pearsonR(golden, candidate);
+  const spearman = pearsonR(toRanks(golden), toRanks(candidate));
+
+  return { spearman, pearson, mae, n };
+}
+
+/**
+ * @param {number[]} xs
+ * @param {number[]} ys
+ * @returns {number}
+ */
+function pearsonR(xs, ys) {
+  const n = xs.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += xs[i];
+    sumY += ys[i];
+    sumXY += xs[i] * ys[i];
+    sumX2 += xs[i] * xs[i];
+    sumY2 += ys[i] * ys[i];
+  }
+  const denom = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  return denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+}
+
+/**
+ * Assign fractional ranks (average of tied positions) to an array of values.
+ * @param {number[]} arr
+ * @returns {number[]}
+ */
+function toRanks(arr) {
+  const indexed = arr.map((v, i) => ({ v, i }));
+  indexed.sort((a, b) => a.v - b.v);
+  const ranks = new Array(arr.length);
+  let pos = 0;
+  while (pos < indexed.length) {
+    let end = pos + 1;
+    while (end < indexed.length && indexed[end].v === indexed[pos].v) end++;
+    const avgRank = (pos + end - 1) / 2 + 1;
+    for (let k = pos; k < end; k++) ranks[indexed[k].i] = avgRank;
+    pos = end;
+  }
+  return ranks;
+}
+
+/**
  * Soft signal: candidate events whose title tokens don't appear in any of
  * the source page texts. False positives are common (the LLM may rephrase a
  * title), so this is informational, not part of precision/recall.
@@ -312,7 +407,7 @@ export function hallucinationSignal(candidate, hits) {
   for (let i = 0; i < candidate.length; i++) {
     const tokens = candidate[i].title
       .toLowerCase()
-      .split(/[^a-z0-9]+/)
+      .split(/[^\p{Letter}\p{Number}]+/u)
       .filter((t) => t.length >= 4);
     if (tokens.length === 0) continue;
     const present = tokens.filter((t) => corpus.includes(t)).length;
