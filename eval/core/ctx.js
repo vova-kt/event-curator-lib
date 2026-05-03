@@ -62,12 +62,13 @@ export function buildExtractCtx({ query, model, apiKey, temperature = 0, logLeve
  *   query: { city: string, queryText: string, timeframe: { from: string, to: string } },
  *   apiKey?: string,
  *   model?: string,
+ *   llm?: import('../../src/core/types.js').LLMAdapter,
  *   limit?: number,
  *   temperature?: number,
  *   logLevel?: string,
  * }} opts
  */
-export function buildExpandCtx({ query, apiKey, model, limit, temperature, logLevel }) {
+export function buildExpandCtx({ query, apiKey, model, llm: externalLlm, limit, temperature, logLevel }) {
   const config = mergeConfig(DEFAULTS, {
     ...(model ? { llm: { model } } : {}),
     queryExpansion: {
@@ -79,6 +80,9 @@ export function buildExpandCtx({ query, apiKey, model, limit, temperature, logLe
   const logger = createLogger(logLevel, null);
   const nullStorage = { getKV: async () => null, setKV: async () => {} };
   const base = { config, logger, query, storage: nullStorage };
+  if (externalLlm) {
+    return { ...base, llm: externalLlm };
+  }
   if (apiKey && model) {
     return { ...base, llm: withTemperature(openai({ apiKey, model }), 0) };
   }

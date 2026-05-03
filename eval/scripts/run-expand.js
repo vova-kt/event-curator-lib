@@ -2,24 +2,25 @@
 /**
  * run-expand.js — the query-expansion eval.
  *
- * Loads `<slug>.expand-input.json`, calls the `llmExpand` strategy directly
- * with a real LLM, and renders a metric report against
- * `<slug>.expand-golden.json` (a hand-curated list of "must-have" query
- * phrasings) when present. Writes the run record to
- * `eval/runs/<slug>__<ts>.json` for offline diffing.
+ * Calls the `llmExpand` strategy with a real LLM and renders metric reports
+ * against `<slug>.expand-golden.json` when present.
  *
- * Multiple query configs are dispatched in parallel; each gets its own report
- * and run file, plus a generalized aggregate summary at the end.
+ * Two modes controlled by the GRID array:
+ *   - **Single variation** (1 entry): detailed per-config reports, aggregate
+ *     summary, run files, and a cost/usage footer — the daily prompt-iteration
+ *     workflow.
+ *   - **Grid sweep** (multiple entries): compact progress output followed by a
+ *     cost/quality comparison table across all variations.
  *
- * The eval calls the strategy in isolation — no discover/search/extract.
- * See [src/strategies/queryExpansion/llmExpand.js](../../src/strategies/queryExpansion/llmExpand.js).
- *
- * Configure in [eval/config.js](../config.js) → `runExpand`. Run:
+ * Configure MODELS / TEMPERATURES / LIMITS below, then run:
  *   node --env-file=.env.dev eval/scripts/run-expand.js
  */
 
 import { resolve } from 'node:path';
 import { llmExpand } from '../../src/strategies/queryExpansion/index.js';
+import { openai } from '../../src/adapters/llm/openai.js';
+import { withTracking } from '../../src/adapters/llm/tracking.js';
+import { calculateCost } from '../../src/core/pricing.js';
 import { requireEnv } from '../core/env.js';
 import { loadExpandGoldenFixture } from '../core/fixtures.js';
 import { writeRun, gitShaOf } from '../core/runs.js';
@@ -36,8 +37,6 @@ import { ratio, compose } from '../core/report.js';
 
 
 /**
- * Build a timeframe `{ from, to }` window starting `startOffsetDays` from today
- * and lasting `windowDays`.
  * @param {number} startOffsetDays
  * @param {number} windowDays
  */
@@ -49,92 +48,82 @@ function timeframeOf(startOffsetDays, windowDays) {
 
 /**
  * @typedef {{
- *   model: string,
  *   query: { queryText: string, city: string, timeframe: { from: string, to: string } },
- *   expectedLanguages: string[],   // ISO 639-3 codes the city's audience speaks
- *   limit: number,
- *   temperature: number,
+ *   expectedLanguages: string[],
  * }} ExpandConfig
  */
 
-const MODEL = 'gpt-5.4-mini';
-const LIMIT = 8;
-const TEMPERATURE = 0.1;
+/**
+ * @typedef {{ model: string, temperature: number, limit: number }} Variation
+ */
+
+/* ------------------------------------------------------------------ */
+/*  Grid — edit to sweep across model / temperature / limit            */
+/* ------------------------------------------------------------------ */
+
+const MODELS = ['gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-5.4'];
+const TEMPERATURES = [0.0, 0.3, 0.7];
+const LIMITS = [5, 8, 12];
+
+/** @type {Variation[]} */
+const GRID = MODELS.flatMap((model) =>
+  TEMPERATURES.flatMap((temperature) =>
+    LIMITS.map((limit) => ({ model, temperature, limit })),
+  ),
+);
+
+/* ------------------------------------------------------------------ */
+/*  Query configs                                                      */
+/* ------------------------------------------------------------------ */
 
 /** @type {ExpandConfig[]} */
 const configs = [
   {
-    model: MODEL,
     query: { queryText: 'russian standup', city: 'berlin', timeframe: timeframeOf(0, 30) },
     expectedLanguages: ['rus', 'deu', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'jazz concert', city: 'new york', timeframe: timeframeOf(0, 7) },
     expectedLanguages: ['eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'tech meetup ai', city: 'san francisco', timeframe: timeframeOf(0, 14) },
     expectedLanguages: ['eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'contemporary art exhibition', city: 'paris', timeframe: timeframeOf(7, 120) },
     expectedLanguages: ['fra', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'street food festival', city: 'bangkok', timeframe: timeframeOf(0, 21) },
     expectedLanguages: ['tha', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'startup pitch night', city: 'london', timeframe: timeframeOf(0, 75) },
     expectedLanguages: ['eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'marathon half-marathon', city: 'tokyo', timeframe: timeframeOf(14, 90) },
     expectedLanguages: ['jpn', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'indie film screening', city: 'amsterdam', timeframe: timeframeOf(0, 14) },
     expectedLanguages: ['nld', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'yoga retreat weekend', city: 'lisbon', timeframe: timeframeOf(7, 45) },
     expectedLanguages: ['por', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
   {
-    model: MODEL,
     query: { queryText: 'salsa bachata social', city: 'barcelona', timeframe: timeframeOf(0, 10) },
     expectedLanguages: ['spa', 'cat', 'eng'],
-    limit: LIMIT,
-    temperature: TEMPERATURE,
   },
 ];
 
+
+/* ------------------------------------------------------------------ */
+/*  Main                                                               */
+/* ------------------------------------------------------------------ */
 
 try {
   const apiKey = requireEnv('OPENAI_API_KEY');
@@ -142,51 +131,147 @@ try {
     new URL('../../src/prompts/expandQueries.js', import.meta.url).pathname,
   );
   const promptSha = gitShaOf(promptPath);
+  const isGrid = GRID.length > 1;
 
-  console.log(`expand eval — ${configs.length} config(s)\n`);
-
-  const results = await Promise.all(configs.map((cfg) => runOne(cfg, { apiKey, promptSha })));
-
-  for (const r of results) {
-    console.log(`=== ${r.slug} ===`);
-    console.log(`model: ${r.config.model}  city: ${r.config.query.city}  query: "${r.config.query.queryText}"  timeframe: ${r.config.query.timeframe.from}→${r.config.query.timeframe.to}`);
-    console.log(`expanded to ${r.queries.length} queries in ${(r.elapsedMs / 1000).toFixed(1)}s`);
-    console.log('\n' + r.report.text + '\n');
-    console.log(`run saved: ${r.runPath}`);
-    if (!r.golden) {
-      console.log(
-        `\nno golden file yet. Hand-curate a list of must-have phrasings, save as ` +
-          `eval/fixtures/${r.slug}.expand-golden.json with shape ` +
-          `{ "slug": "${r.slug}", "queries": [...] }.`,
-      );
-    }
-    console.log();
+  if (isGrid) {
+    console.log(`expand grid eval — ${GRID.length} variations × ${configs.length} configs = ${GRID.length * configs.length} LLM calls\n`);
+  } else {
+    console.log(`expand eval — ${configs.length} config(s)\n`);
   }
 
-  if (results.length > 1) {
-    console.log('=== aggregate (' + results.length + ' configs) ===');
-    console.log(buildAggregateReport(results) + '\n');
+  /**
+   * @typedef {{
+   *   variation: Variation,
+   *   results: RunResult[],
+   *   elapsedMs: number,
+   *   usage: import('../../src/adapters/llm/tracking.js').UsageStats,
+   *   cost: import('../../src/core/pricing.js').CostBreakdown | null,
+   * }} VariationResult
+   */
+
+  /** @type {VariationResult[]} */
+  const variationResults = [];
+
+  for (const variation of GRID) {
+    const { model, temperature, limit } = variation;
+    const tracker = withTracking(openai({ apiKey, model }));
+
+    if (isGrid) {
+      process.stdout.write(`  ${model} t=${temperature} l=${limit} ...`);
+    }
+
+    const start = Date.now();
+    const results = await Promise.all(
+      configs.map(async (cfg) => {
+        try {
+          return await runOne(cfg, {
+            llm: tracker.llm,
+            model,
+            temperature,
+            limit,
+            promptSha,
+            writeRunRecord: !isGrid,
+          });
+        } catch (err) {
+          if (!isGrid) throw err;
+          return /** @type {RunResult} */ ({
+            config: cfg,
+            slug: `${model}-${cfg.query.queryText}-${cfg.query.city}`,
+            queries: [],
+            golden: null,
+            elapsedMs: 0,
+            report: null,
+            runPath: null,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }),
+    );
+    const elapsedMs = Date.now() - start;
+    const usage = tracker.usage();
+    const cost = calculateCost(model, {
+      inputTokens: usage.totalInput,
+      outputTokens: usage.totalOutput,
+    });
+
+    if (isGrid) {
+      const errors = results.filter((r) => r.error).length;
+      console.log(` ${(elapsedMs / 1000).toFixed(1)}s ${errors ? errors + ' errors' : 'ok'}`);
+    }
+
+    variationResults.push({ variation, results, elapsedMs, usage, cost });
+  }
+
+  if (!isGrid) {
+    const { variation, results, usage, cost } = variationResults[0];
+    for (const r of results) {
+      console.log(`=== ${r.slug} ===`);
+      console.log(`model: ${variation.model}  city: ${r.config.query.city}  query: "${r.config.query.queryText}"  timeframe: ${r.config.query.timeframe.from}→${r.config.query.timeframe.to}`);
+      console.log(`expanded to ${r.queries.length} queries in ${(r.elapsedMs / 1000).toFixed(1)}s`);
+      console.log('\n' + r.report.text + '\n');
+      console.log(`run saved: ${r.runPath}`);
+      if (!r.golden) {
+        console.log(
+          `\nno golden file yet. Hand-curate a list of must-have phrasings, save as ` +
+            `eval/fixtures/${r.slug}.expand-golden.json with shape ` +
+            `{ "slug": "${r.slug}", "queries": [...] }.`,
+        );
+      }
+      console.log();
+    }
+
+    if (results.length > 1) {
+      console.log('=== aggregate (' + results.length + ' configs) ===');
+      console.log(buildAggregateReport(results) + '\n');
+    }
+
+    console.log(`usage: ${usage.totalInput} input + ${usage.totalOutput} output tokens, ${usage.calls} calls`);
+    if (cost) {
+      console.log(`cost: $${cost.totalCost.toFixed(4)} (input: $${cost.inputCost.toFixed(4)}, output: $${cost.outputCost.toFixed(4)})`);
+    }
+  } else {
+    console.log('\n' + renderGridReport(variationResults));
   }
 } catch (err) {
   console.error(err instanceof Error ? err.stack ?? err.message : err);
   process.exit(1);
 }
 
+
+/* ------------------------------------------------------------------ */
+/*  Per-config runner                                                  */
+/* ------------------------------------------------------------------ */
+
 /**
- * @param {ExpandConfig} config
- * @param {{ apiKey: string, promptSha: string }} env
+ * @typedef {{
+ *   config: ExpandConfig, slug: string, queries: string[],
+ *   golden: { queries: string[] } | null, elapsedMs: number,
+ *   report: ReturnType<typeof buildReport> | null,
+ *   runPath: string | null,
+ *   error?: string,
+ * }} RunResult
  */
-async function runOne(config, { apiKey, promptSha }) {
-  const slug = `${config.model}-${config.query.queryText}-${config.query.city}`;
+
+/**
+ * @param {ExpandConfig} cfg
+ * @param {{
+ *   llm: import('../../src/core/types.js').LLMAdapter,
+ *   model: string, temperature: number, limit: number,
+ *   promptSha: string, writeRunRecord: boolean,
+ * }} opts
+ * @returns {Promise<RunResult>}
+ */
+async function runOne(cfg, { llm, model, temperature, limit, promptSha, writeRunRecord }) {
+  const slug = `${model}-${cfg.query.queryText}-${cfg.query.city}`;
   const golden = loadExpandGoldenFixture(slug);
 
   const start = Date.now();
   const ctx = buildExpandCtx({
-    query: config.query,
-    apiKey,
-    model: config.model,
-    limit: config.limit,
-    temperature: config.temperature,
+    query: cfg.query,
+    llm,
+    model,
+    limit,
+    temperature,
   });
   const queries = await llmExpand()(ctx);
   const elapsedMs = Date.now() - start;
@@ -194,20 +279,28 @@ async function runOne(config, { apiKey, promptSha }) {
   const report = buildReport({
     candidate: queries,
     golden: golden?.queries ?? null,
-    expectedLanguages: config.expectedLanguages,
+    expectedLanguages: cfg.expectedLanguages,
   });
 
-  const runPath = writeRun({
-    slug,
-    kind: RunKind.EXPAND,
-    llm: { provider: 'openai', model: config.model, temperature: ctx.config.queryExpansion.temperature },
-    promptHashes: { 'expandQueries.js': promptSha },
-    output: queries,
-    report: report.data,
-  });
+  let runPath = null;
+  if (writeRunRecord) {
+    runPath = writeRun({
+      slug,
+      kind: RunKind.EXPAND,
+      llm: { provider: 'openai', model, temperature },
+      promptHashes: { 'expandQueries.js': promptSha },
+      output: queries,
+      report: report.data,
+    });
+  }
 
-  return { config, slug, queries, golden, elapsedMs, report, runPath };
+  return { config: cfg, slug, queries, golden, elapsedMs, report, runPath };
 }
+
+
+/* ------------------------------------------------------------------ */
+/*  Per-config report                                                  */
+/* ------------------------------------------------------------------ */
 
 /**
  * @param {{ candidate: string[], golden: string[] | null, expectedLanguages: string[] }} args
@@ -265,44 +358,43 @@ function buildReport({ candidate, golden, expectedLanguages }) {
   };
 }
 
+
+/* ------------------------------------------------------------------ */
+/*  Aggregate report (single-variation mode)                           */
+/* ------------------------------------------------------------------ */
+
 /**
- * Generalized cross-config summary. Aggregates the per-config report data
- * into averages (quality signals) and totals (violation counts) so a single
- * glance answers "did this prompt change improve things on average?".
- *
- * @param {Awaited<ReturnType<typeof runOne>>[]} results
+ * @param {RunResult[]} results
  */
 function buildAggregateReport(results) {
   const n = results.length;
   const totalQueries = sum(results.map((r) => r.queries.length));
   const avgPerConfig = totalQueries / n;
 
-  const withGolden = results.filter((r) => r.report.data.goldenCoverage);
+  const withGolden = results.filter((r) => r.report?.data.goldenCoverage);
   const avgCoverage = withGolden.length === 0
     ? null
     : avg(withGolden.map((r) => r.report.data.goldenCoverage.coverage));
 
-  const avgDiversity = avg(results.map((r) => r.report.data.diversity.avgDistance));
-  const minDiversity = Math.min(...results.map((r) => r.report.data.diversity.minDistance));
+  const avgDiversity = avg(results.map((r) => r.report?.data.diversity.avgDistance ?? 0));
+  const minDiversity = Math.min(...results.map((r) => r.report?.data.diversity.minDistance ?? 1));
 
-  const violations = (cc) =>
-    cc.tooLong.length + cc.booleanOps.length + cc.quoted.length + cc.siteFilter.length + cc.duplicates.length;
-  const totalViolations = sum(results.map((r) => violations(r.report.data.constraintCompliance)));
-  const totalBadTime = sum(results.map((r) => r.report.data.badTimeRefCount));
-  const totalMonthYear = sum(results.map((r) => r.report.data.monthYearCount));
-  const avgLangCoverage = avg(results.map((r) => r.report.data.languageCoverage.coverage));
+  const totalViolations = sum(results.map((r) => r.report ? violationCount(r.report.data.constraintCompliance) : 0));
+  const totalBadTime = sum(results.map((r) => r.report?.data.badTimeRefCount ?? 0));
+  const totalMonthYear = sum(results.map((r) => r.report?.data.monthYearCount ?? 0));
+  const avgLangCoverage = avg(results.map((r) => r.report?.data.languageCoverage.coverage ?? 0));
 
   const perConfig = results
     .map((r) => {
-      const cov = r.report.data.goldenCoverage;
-      const v = violations(r.report.data.constraintCompliance);
+      const cov = r.report?.data.goldenCoverage;
+      const v = r.report ? violationCount(r.report.data.constraintCompliance) : 0;
       return (
         `  - ${r.slug}` +
         `  n=${r.queries.length}` +
         `  cov=${cov ? cov.coverage.toFixed(3) : 'n/a'}` +
-        `  div=${r.report.data.diversity.avgDistance.toFixed(3)}` +
+        `  div=${(r.report?.data.diversity.avgDistance ?? 0).toFixed(3)}` +
         `  viol=${v}` +
-        `  badTime=${r.report.data.badTimeRefCount}`
+        `  badTime=${r.report?.data.badTimeRefCount ?? 0}`
       );
     })
     .join('\n');
@@ -327,6 +419,113 @@ function buildAggregateReport(results) {
   ];
 
   return compose(sections);
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Grid report (multi-variation mode)                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @param {VariationResult[]} all
+ */
+function renderGridReport(all) {
+  const hdr =
+    'model             temp  limit  queries  diversity  langCov  violations  badTime  inTok     outTok    cost$     time';
+  const sep = '-'.repeat(hdr.length);
+  const rows = all.map((v) => {
+    const ok = v.results.filter((r) => !r.error);
+    const avgQueries = ok.length === 0 ? 0 : ok.reduce((s, r) => s + r.queries.length, 0) / ok.length;
+    const avgDiv = ok.length === 0 ? 0 : ok.reduce((s, r) => s + (r.report?.data.diversity.avgDistance ?? 0), 0) / ok.length;
+    const avgLang = ok.length === 0 ? 0 : ok.reduce((s, r) => s + (r.report?.data.languageCoverage.coverage ?? 0), 0) / ok.length;
+    const totalViol = ok.reduce((s, r) => s + (r.report ? violationCount(r.report.data.constraintCompliance) : 0), 0);
+    const totalBad = ok.reduce((s, r) => s + (r.report?.data.badTimeRefCount ?? 0), 0);
+    const errors = v.results.filter((r) => r.error).length;
+    const errSuffix = errors > 0 ? `  (${errors} err)` : '';
+    const costStr = v.cost ? v.cost.totalCost.toFixed(4) : 'n/a';
+
+    return [
+      v.variation.model.padEnd(18),
+      v.variation.temperature.toFixed(1).padStart(4),
+      String(v.variation.limit).padStart(6),
+      avgQueries.toFixed(1).padStart(8),
+      avgDiv.toFixed(3).padStart(10),
+      avgLang.toFixed(3).padStart(8),
+      String(totalViol).padStart(11),
+      String(totalBad).padStart(8),
+      String(v.usage.totalInput).padStart(9),
+      String(v.usage.totalOutput).padStart(9),
+      costStr.padStart(9),
+      (v.elapsedMs / 1000).toFixed(1).padStart(7) + 's' + errSuffix,
+    ].join('');
+  });
+
+  const totalCost = all.reduce((s, v) => s + (v.cost?.totalCost ?? 0), 0);
+  const totalTime = all.reduce((s, v) => s + v.elapsedMs, 0);
+  const totalIn = all.reduce((s, v) => s + v.usage.totalInput, 0);
+  const totalOut = all.reduce((s, v) => s + v.usage.totalOutput, 0);
+
+  return [
+    `expand grid eval — ${all.length} variations × ${configs.length} configs\n`,
+    sep,
+    hdr,
+    sep,
+    ...rows,
+    sep,
+    `totals: ${totalIn} input + ${totalOut} output tokens, $${totalCost.toFixed(4)}, ${(totalTime / 1000).toFixed(1)}s`,
+    '',
+    renderInsights(all),
+  ].join('\n');
+}
+
+/**
+ * @param {VariationResult[]} all
+ */
+function renderInsights(all) {
+  const scored = all
+    .filter((v) => v.results.every((r) => !r.error))
+    .map((v) => {
+      const ok = v.results;
+      const avgDiv = ok.reduce((s, r) => s + (r.report?.data.diversity.avgDistance ?? 0), 0) / ok.length;
+      const avgLang = ok.reduce((s, r) => s + (r.report?.data.languageCoverage.coverage ?? 0), 0) / ok.length;
+      const totalViol = ok.reduce((s, r) => s + (r.report ? violationCount(r.report.data.constraintCompliance) : 0), 0);
+      const totalBad = ok.reduce((s, r) => s + (r.report?.data.badTimeRefCount ?? 0), 0);
+      const quality = avgDiv * 0.4 + avgLang * 0.4 - totalViol * 0.05 - totalBad * 0.05;
+      return { v, avgDiv, avgLang, totalViol, totalBad, quality };
+    });
+
+  if (scored.length === 0) return 'no error-free variations to rank';
+
+  scored.sort((a, b) => b.quality - a.quality);
+  const best = scored[0];
+  const cheapest = scored.reduce((a, b) => (a.v.cost?.totalCost ?? Infinity) < (b.v.cost?.totalCost ?? Infinity) ? a : b);
+
+  const tag = (s) => `${s.v.variation.model} t=${s.v.variation.temperature} l=${s.v.variation.limit}`;
+
+  const lines = [
+    'insights',
+    `  best quality:  ${tag(best)}  (div=${best.avgDiv.toFixed(3)} lang=${best.avgLang.toFixed(3)} viol=${best.totalViol} bad=${best.totalBad})  $${(best.v.cost?.totalCost ?? 0).toFixed(4)}`,
+    `  cheapest:      ${tag(cheapest)}  $${(cheapest.v.cost?.totalCost ?? 0).toFixed(4)}  (div=${cheapest.avgDiv.toFixed(3)} lang=${cheapest.avgLang.toFixed(3)} viol=${cheapest.totalViol})`,
+  ];
+
+  if (best !== cheapest && best.v.cost && cheapest.v.cost) {
+    const costDelta = best.v.cost.totalCost - cheapest.v.cost.totalCost;
+    const qualDelta = best.quality - cheapest.quality;
+    lines.push(`  quality premium: +$${costDelta.toFixed(4)} for +${qualDelta.toFixed(3)} quality score`);
+  }
+
+  return lines.join('\n');
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+/** @param {ReturnType<typeof constraintCompliance>} cc */
+function violationCount(cc) {
+  return cc.tooLong.length + cc.booleanOps.length + cc.quoted.length +
+    cc.siteFilter.length + cc.duplicates.length;
 }
 
 /** @param {number[]} a */

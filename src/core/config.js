@@ -64,6 +64,8 @@ export const DEFAULTS = Object.freeze({
 
   /** Tuning for the `llmExpand` query-expansion strategy. */
   queryExpansion: {
+    /** Default model id passed to the adapter (e.g. an OpenAI / Anthropic model id). */
+    model: 'gpt-5.4-mini',
     /** Max queries `llmExpand` returns when no per-call limit is given. */
     defaultLimit: 8,
     /** Sampling temperature for the expand-queries LLM call. Higher than the
