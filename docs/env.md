@@ -7,6 +7,7 @@ The lib core never reads `process.env` — env vars are a surface-level concern 
 | `OPENAI_API_KEY` | `adapters/llm/openai` factory        | OpenAI auth                   |
 | `OPENAI_MODEL`   | `examples/*`, `app/tui/config.js`    | Model override                |
 | `TAVILY_API_KEY` | `adapters/search/tavily` factory     | Tavily auth                   |
+| `BRAVE_API_KEY`  | `adapters/search/brave` factory      | Brave Search auth             |
 | `EVENTS_DB_PATH` | `examples/*`, `app/tui/config.js`    | SQLite file path              |
 
 See `.env.example`. The TUI also persists keys to `~/.config/events-curator/config.json` after the first interactive entry; env vars always override the stored values (see [apps/tui.md](apps/tui.md)).

@@ -13,4 +13,4 @@ types/
 coverage/
 .vscode/
 .idea/
-.log
+*.log

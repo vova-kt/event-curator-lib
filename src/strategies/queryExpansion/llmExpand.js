@@ -19,7 +19,10 @@ const CACHE_PREFIX = 'qx:llmExpand:v2';
  */
 export function llmExpand() {
   return async function llmExpandStrategy(ctx, query) {
-    const cap = ctx.config.queryExpansion.maxQueries;
+    const cap = ctx.config.search.maxQueries;
+    if (cap < 1) {
+      return { queries: [query.queryText] };
+    }
     const tf = resolveTimeframe(query.timeframe, ctx.config.pipeline.defaultRollingDays);
     const key = cacheKey(query.city, query.queryText, tf);
 
@@ -27,9 +30,6 @@ export function llmExpand() {
     if (cached) {
       const parsed = safeParseQueries(cached);
       if (parsed) return { queries: parsed.slice(0, cap) };
-    }
-    if (ctx.config.queryExpansion.maxQueries > 1) {
-      return { queries: [query.queryText] };
     }
 
     try {
@@ -40,12 +40,12 @@ export function llmExpand() {
         limit: cap,
       });
       const { data, usage } = await structuredChat(ctx.llm, {
-        model: ctx.config.queryExpansion.model,
+        model: ctx.config.search.model,
         system: prompt.system,
         messages: [{ role: 'user', content: prompt.user }],
         schema: expandQueriesSchema,
-        temperature: ctx.config.queryExpansion.temperature,
-        maxTokens: ctx.config.queryExpansion.maxTokens,
+        temperature: ctx.config.search.temperature,
+        maxTokens: ctx.config.search.maxTokens,
         maxRetries: ctx.config.llm.maxRetries,
       });
       const queries = sanitize(/** @type {{ queries?: unknown }} */ (data).queries);

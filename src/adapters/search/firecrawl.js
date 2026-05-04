@@ -6,6 +6,8 @@
  * Tune as needed; the adapter contract is what matters for the rest of the lib.
  */
 
+import { DEFAULTS } from '../../core/config.js';
+
 /**
  * @param {{ apiKey: string, endpoint?: string }} opts
  * @returns {import('../../core/types.js').SearchAdapter}
@@ -22,7 +24,7 @@ export function firecrawl({ apiKey, endpoint = 'https://api.firecrawl.dev/v1/sea
         },
         body: JSON.stringify({
           query,
-          limit: opts.maxResults ?? 10,
+          limit: DEFAULTS.search.maxResultsPerQuery,
           scrapeOptions: { formats: ['markdown'] },
         }),
         signal: opts.signal,

@@ -40,7 +40,7 @@ const shared = {
   expand: 'llm',
   /** Used only when expand === 'llm'. */
   model: DEFAULTS.llm.model,
-  maxResults: 20,
+  maxResults: 10,
   /** Overwrite existing <slug>.search.json files. */
   force: false,
 };
@@ -94,7 +94,7 @@ for (const { query, city } of queries) {
 
     console.log(`  fetching: ${searchQueries.length} queries × max ${shared.maxResults}`);
     const allHitsArrays = await Promise.all(
-      searchQueries.map((q) => adapter.search(q, { maxResults: shared.maxResults })),
+      searchQueries.map((q) => adapter.search(q)),
     );
     const allHits = allHitsArrays.flat();
     const hits = dedupeByUrl(allHits);

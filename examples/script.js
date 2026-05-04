@@ -4,58 +4,76 @@
  */
 
 import { createCurator, DEFAULTS, EventState } from '../src/index.js';
-import { sqlite } from '../src/adapters/storage/sqlite.js';
 import { memory } from '../src/adapters/storage/memory.js';
 import { openai } from '../src/adapters/llm/openai.js';
 import { tavily } from '../src/adapters/search/tavily.js';
 import { stubLLM, stubSearch } from './_stubs.js';
 import { mergeConfig } from '../src/core/config.js';
 import { llmExpand } from '../src/strategies/queryExpansion/index.js';
+import { brave } from '../src/adapters/search/brave.js';
 
 const args = parseArgs(process.argv.slice(2));
 
 if (!args.city || !args.query) {
   console.error(
-    'Usage: node examples/script.js --city <city> --query <text> [--days N | --from ISO --to ISO] [--limit N] [--guidance text] [--db path] [--dry]',
+    'Usage: node examples/script.js --city "berlin" --query "russian standup" --days 14 --maxQueries 2 --maxEvents 10 --guidance "no open mic" [--dry]',
   );
   process.exit(1);
 }
 
-const dry = args.dry === 'true' || args.dry === '';
+let options = {
+  dry: true,
+  search: [stubSearch()],
+  storage: memory(),
+  llm: stubLLM(),
+  maxEvents: Number(args.maxEvents ?? 10),
+  maxQueries: Number(args.maxQueries ?? 1),
+  timeframe: {
+    rolling: { days: Number(args.days ?? 7) },
+  },
+  eventsModel: DEFAULTS.eventExtraction.model,
+};
 
-const llm = dry ? stubLLM() : openai({ apiKey: requireEnv('OPENAI_API_KEY') });
-
-const search = dry ? [stubSearch()] : [tavily({ apiKey: requireEnv('TAVILY_API_KEY') })];
-
-const storage = dry
-  ? memory()
-  : sqlite({ path: args.db ?? process.env.EVENTS_DB_PATH ?? './events.db' });
+if (args.dry !== 'true' && args.dry !== '') {
+  options = {
+    ...options,
+    dry: false,
+    llm: openai({ apiKey: requireEnv('OPENAI_API_KEY') }),
+    search: [
+      brave({ apiKey: requireEnv('BRAVE_API_KEY') }),
+      tavily({ apiKey: requireEnv('TAVILY_API_KEY') }),
+    ],
+  };
+}
 
 const curator = await createCurator({
-  llm,
-  search,
-  storage,
+  llm: options.llm,
+  search: options.search,
+  storage: options.storage,
   strategies: {
-    queryExpansion: [llmExpand()]
+    queryExpansion: [llmExpand()],
   },
   config: mergeConfig(DEFAULTS, {
-    queryExpansion: {
-      ...DEFAULTS.queryExpansion,
-      maxQueries: 1
-    }
-  })
+    search: {
+      ...DEFAULTS.search,
+      maxQueries: options.maxQueries,
+    },
+    eventExtraction: {
+      ...DEFAULTS.eventExtraction,
+      model: options.eventsModel,
+    },
+    pipeline: {
+      ...DEFAULTS.pipeline,
+      maxEvents: options.maxEvents,
+    },
+  }),
 });
-
-const timeframe =
-  args.from && args.to
-    ? { from: args.from, to: args.to }
-    : { rolling: { days: Number(args.days ?? 14) } };
 
 const { events } = await curator.curate({
   city: args.city,
   queryText: args.query,
-  timeframe,
-  limit: Number(args.limit ?? 10),
+  timeframe: options.timeframe,
+  maxEvents: options.maxEvents,
   guidance: args.guidance,
 });
 
@@ -63,15 +81,8 @@ if (events.length === 0) {
   console.log('(no events found)');
 } else {
   for (const [i, e] of events.entries()) {
-    const date = e.startsAt.slice(0, 16).replace('T', ' ');
-    const price = e.price?.free
-      ? 'free'
-      : e.price?.min !== undefined
-        ? `${e.price.min}${e.price.currency ? ' ' + e.price.currency : ''}`
-        : '';
-    console.log(
-      `[${i + 1}] ${date}  ${e.title}  —  ${e.venue.name}${price ? ` (${price})` : ''}`,
-    );
+    const price = formatPrice(e.price);
+    console.log(`[${i + 1}] ${e.deduplicationKey}${price ? ` – (${price})` : ''}`);
     if (e.rationale) console.log(`     ↳ ${e.rationale}`);
   }
   // The script prints every returned event in one shot, so all of them count
@@ -118,4 +129,16 @@ function requireEnv(name) {
     process.exit(1);
   }
   return v;
+}
+
+/**
+ * @param {import("../src/core/types.js").EventPrice} [price]
+ */
+function formatPrice(price) {
+  if (!price) return ''
+  return price.free
+    ? 'free'
+    : price.min !== undefined
+      ? `${price.min}${price.currency ? ' ' + price.currency : ''}`
+      : '';
 }

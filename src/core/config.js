@@ -48,10 +48,20 @@ export const DEFAULTS = Object.freeze({
 
   /** Defaults applied to every configured search adapter. */
   search: {
+    /** Default model id passed to the adapter (e.g. an OpenAI / Anthropic model id). */
+    model: 'gpt-5.4-mini',
+    /** Max queries `llmExpand` returns when no per-call limit is given. */
+    maxQueries: 8,
     /** Per-adapter cap on hits returned per query. */
-    maxResultsPerAdapter: 15,
+    maxResultsPerQuery: 15,
+    /** Sampling temperature for the expand-queries LLM call. Higher than the
+     *  global default to get phrasing variety without fully randomizing. */
+    temperature: 0.1,
     /** Per-call timeout. Adapters abort the underlying request after this. */
     timeoutMs: 15_000,
+    /** Max output tokens for the expand-queries LLM call. Sized for a short
+     *  JSON list of query strings. */
+    maxTokens: 1024,
   },
 
   /** Pipeline-stage tuning. See [docs/pipeline.md](../../docs/pipeline.md). */
@@ -62,20 +72,6 @@ export const DEFAULTS = Object.freeze({
     defaultRollingDays: 90,
     /** Worker-pool size for the extract stage's parallel LLM calls. */
     maxWorkers: 10,
-  },
-
-  /** Tuning for the `llmExpand` query-expansion strategy. */
-  queryExpansion: {
-    /** Default model id passed to the adapter (e.g. an OpenAI / Anthropic model id). */
-    model: 'gpt-5.4-mini',
-    /** Max queries `llmExpand` returns when no per-call limit is given. */
-    maxQueries: 8,
-    /** Sampling temperature for the expand-queries LLM call. Higher than the
-     *  global default to get phrasing variety without fully randomizing. */
-    temperature: 0.1,
-    /** Max output tokens for the expand-queries LLM call. Sized for a short
-     *  JSON list of query strings. */
-    maxTokens: 1024,
   },
 
   eventExtraction: {

@@ -40,8 +40,8 @@ export function createEvalContext({
     search: [],
     strategies: { queryExpansion: [], dedupe: [], rank: [] },
     config: mergeConfig(DEFAULTS, {
-      queryExpansion: {
-        ...DEFAULTS.queryExpansion,
+      search: {
+        ...DEFAULTS.search,
         ...(qeMaxQueries != null ? { maxQueries: qeMaxQueries } : {}),
         ...(qeModel != null ? { model: qeModel } : {}),
       },

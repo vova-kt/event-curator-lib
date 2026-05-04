@@ -58,8 +58,7 @@ export async function runCuration(ctx, query, opts) {
   emit({ stage: ProgressStage.RANK, phase: ProgressPhase.DONE, count: ranked.length });
   logEvents(log, 'rank', ranked);
 
-  const limit = query.limit ?? ctx.config.pipeline.maxEvents;
-  const events = ranked.slice(0, limit);
+  const events = ranked.slice(0, query.maxEvents);
 
   emit({ stage: ProgressStage.PERSIST, phase: ProgressPhase.START });
   if (events.length > 0) {

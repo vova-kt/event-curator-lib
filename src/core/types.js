@@ -81,7 +81,7 @@
  * @property {string} city
  * @property {string} queryText        // user's freeform initial query (e.g., "indie live music")
  * @property {Timeframe | { rolling: RollingTimeframe }} timeframe
- * @property {number} [limit]
+ * @property {number} [maxEvents]
  * @property {string} [guidance]       // free-text filter & ranking preferences for the LLM
  * @property {SavedQuery} [savedQuery] // when running from a saved entry, attached so strategies can read taste settings
  */
@@ -96,7 +96,7 @@
  * @property {string} city
  * @property {string} queryText
  * @property {number} days
- * @property {number} limit
+ * @property {number} maxEvents
  * @property {string[]} excludeKeywords
  * @property {string[]} [excludeVenues]
  * @property {{ min?: number, max?: number, currency?: string }} [price]
@@ -201,7 +201,7 @@
 /**
  * @typedef {Object} SearchAdapter
  * @property {string} name
- * @property {(query: string, opts?: { maxResults?: number, signal?: AbortSignal }) => Promise<SearchHit[]>} search
+ * @property {(query: string, opts?: { signal?: AbortSignal }) => Promise<SearchHit[]>} search
  */
 
 /**
@@ -280,9 +280,8 @@
  * @property {boolean} dev
  * @property {{ model: string, temperature: number, maxTokens: number, maxRetries: number, batchInputTokens: number, charsPerToken: number }} llm
  * @property {{ model: string, temperature: number }} eventExtraction
- * @property {{ maxResultsPerAdapter: number, timeoutMs: number }} search
+ * @property {{ maxResultsPerQuery: number, timeoutMs: number, model: string, maxQueries: number, temperature: number, maxTokens: number }} search
  * @property {{ maxEvents: number, defaultRollingDays: number, maxWorkers: number }} pipeline
- * @property {{ model: string, maxQueries: number, temperature: number, maxTokens: number }} queryExpansion
  * @property {{ jaccardThreshold: number }} dedupe
  * @property {{ deriveTraits: boolean, traitsRefreshThreshold: number }} preferences
  * @property {{ weights: ScoreWeights }} scoring

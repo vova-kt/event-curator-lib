@@ -3,6 +3,8 @@
  * See docs/adapters.md.
  */
 
+import { DEFAULTS } from '../../core/config.js';
+
 /**
  * @param {{ apiKey: string, endpoint?: string, includeRawContent?: boolean }} opts
  * @returns {import('../../core/types.js').SearchAdapter}
@@ -14,7 +16,7 @@ export function tavily({ apiKey, endpoint = 'https://api.tavily.com/search', inc
       const body = {
         api_key: apiKey,
         query,
-        max_results: opts.maxResults ?? 10,
+        max_results: DEFAULTS.search.maxQueries,
         include_raw_content: includeRawContent,
         search_depth: 'advanced',
       };

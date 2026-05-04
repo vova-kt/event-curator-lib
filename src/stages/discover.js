@@ -33,7 +33,6 @@ export async function discover(ctx, query, opts) {
       tasks.push((async () => {
         try {
           return await adapter.search(q, {
-            maxResults: ctx.config.search.maxResultsPerAdapter,
             signal,
           });
         } catch (err) {

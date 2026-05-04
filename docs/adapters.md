@@ -15,6 +15,7 @@ A factory function returning a plain object is the smallest interface that lets 
 Built-ins:
 
 - **tavily** ([src/adapters/search/tavily.js](../src/adapters/search/tavily.js)) — default. Cheap structured results via the Tavily API.
+- **brave** ([src/adapters/search/brave.js](../src/adapters/search/brave.js)) — opt-in. Uses the Brave Web Search API; returns snippets by default and joins `extra_snippets` into `content` when the API provides them. GET-based, capped at 20 results per request by Brave.
 - **firecrawl** ([src/adapters/search/firecrawl.js](../src/adapters/search/firecrawl.js)) — opt-in. Returns full extracted page content, useful when extraction quality on a tricky source is too low with snippets alone.
 - **playwright** ([src/adapters/search/playwright.js](../src/adapters/search/playwright.js)) — opt-in. Headless browser; only when JS rendering is genuinely required. Heavy.
 

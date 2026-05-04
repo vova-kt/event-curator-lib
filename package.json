@@ -13,6 +13,7 @@
     "./adapters/llm/openai": "./src/adapters/llm/openai.js",
     "./adapters/search/tavily": "./src/adapters/search/tavily.js",
     "./adapters/search/firecrawl": "./src/adapters/search/firecrawl.js",
+    "./adapters/search/brave": "./src/adapters/search/brave.js",
     "./adapters/search/playwright": "./src/adapters/search/playwright.js",
     "./adapters/storage/sqlite": "./src/adapters/storage/sqlite.js",
     "./adapters/storage/indexeddb": "./src/adapters/storage/indexeddb.js",
