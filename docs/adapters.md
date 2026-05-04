@@ -20,11 +20,13 @@ Built-ins:
 
 ### LLM
 
-[src/adapters/llm/](../src/adapters/llm/). Stages call `ctx.llm.chat({ system, messages, json: true })` with prompts loaded from [src/prompts/](../src/prompts/) — see [prompts.md](prompts.md). Stages don't see provider specifics.
+[src/adapters/llm/](../src/adapters/llm/). Stages use `structuredChat(ctx.llm, { system, messages, schema })` (see [src/core/structured.js](../src/core/structured.js)) with prompts and schemas from [src/prompts/](../src/prompts/) — see [prompts.md](prompts.md). `structuredChat` wraps the schema as a tool definition and forces the LLM to call it, extracting typed structured data. Stages don't see provider specifics.
+
+`LLMRequest` supports `tools` and `toolChoice` for structured output via function calling. `LLMResponse` includes `toolCalls` when the model responds with tool calls. The legacy `json: true` path is still supported for backward compat.
 
 Built-in:
 
-- **openai** ([src/adapters/llm/openai.js](../src/adapters/llm/openai.js)) — wraps the `openai` SDK. JSON mode via `response_format: { type: 'json_object' }`. Factory takes only `{ apiKey, baseURL }` — all behavior params (`temperature`, `maxTokens`, `maxRetries`, `reasoningEffort`) flow through `LLMRequest`, not the factory. Usage (`{ inputTokens, outputTokens }`) is always returned.
+- **openai** ([src/adapters/llm/openai.js](../src/adapters/llm/openai.js)) — wraps the `openai` SDK. Structured output via tool calling with `strict: true` (preferred) or legacy JSON mode via `response_format: { type: 'json_object' }`. Factory takes only `{ apiKey, baseURL }` — all behavior params (`temperature`, `maxTokens`, `maxRetries`, `reasoningEffort`) flow through `LLMRequest`, not the factory. Usage (`{ inputTokens, outputTokens }`) is always returned.
 
 ### Storage
 

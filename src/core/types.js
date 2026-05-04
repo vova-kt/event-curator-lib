@@ -5,18 +5,10 @@
  */
 
 /**
- * @typedef {Object} Geo
- * @property {number} lat
- * @property {number} lng
- */
-
-/**
  * @typedef {Object} Venue
  * @property {string} name
  * @property {string} [address]
  * @property {string} city
- * @property {string} [country]
- * @property {Geo} [geo]
  */
 
 /**
@@ -47,7 +39,7 @@
  * @typedef {Object} Event
  * @property {string} id                 // canonical hash; see core/identity.js
  * @property {string} title
- * @property {string} [description]
+ * @property {string} description
  * @property {string} startsAt           // ISO 8601 — earliest/primary occurrence
  * @property {string} [endsAt]           // ISO 8601
  * @property {string[]} [occurrences]    // all dates (ISO 8601) for recurring events; includes startsAt
@@ -159,11 +151,32 @@
  */
 
 /**
+ * @typedef {Object} LLMTool
+ * @property {string} name
+ * @property {string} [description]
+ * @property {Record<string, unknown>} inputSchema
+ */
+
+/**
+ * @typedef {Object} LLMToolChoice
+ * @property {'tool'} type
+ * @property {string} name
+ */
+
+/**
+ * @typedef {Object} LLMToolCall
+ * @property {string} name
+ * @property {unknown} input
+ */
+
+/**
  * @typedef {Object} LLMRequest
  * @property {string} model
  * @property {string} system
  * @property {LLMMessage[]} messages
  * @property {boolean} [json]
+ * @property {LLMTool[]} [tools]
+ * @property {LLMToolChoice} [toolChoice]
  * @property {number} [temperature]
  * @property {number} [maxTokens]
  * @property {number} [maxRetries]
@@ -175,6 +188,7 @@
  * @typedef {Object} LLMResponse
  * @property {string} text
  * @property {unknown} [json]
+ * @property {LLMToolCall[]} [toolCalls]
  * @property {LLMUsage} usage
  */
 

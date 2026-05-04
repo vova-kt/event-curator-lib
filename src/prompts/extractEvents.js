@@ -1,5 +1,144 @@
 import { buildSystem } from './_system.js';
 
+/** @type {Record<string, unknown>} */
+export const extractEventsSchema = {
+  type: 'object',
+  properties: {
+    events: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description: 'Performer/group name; append program suffix after a dash when source mentions one',
+          },
+          description: {
+            type: 'string',
+            description: 'Single sentence in the query language summarising the event',
+          },
+          venue: {
+            type: 'object',
+            description: 'Venue location details, "unknown" if data is missing',
+            properties: {
+              name: {
+                type: 'string',
+              },
+              address: {
+                type: 'string',
+              },
+              city: {
+                type: 'string',
+              },
+            },
+            required: ['name', 'address', 'city'],
+            additionalProperties: false,
+          },
+          startsAt: {
+            type: 'string',
+            description: 'ISO 8601 datetime.',
+          },
+          endsAt: {
+            type: 'string',
+            description: 'ISO 8601 datetime.',
+          },
+          occurrences: {
+            type: 'array',
+            items: {
+              type: 'string',
+            },
+            description: 'All ISO 8601 dates within timeframe for recurring events;',
+          },
+          deduplicationKey: {
+            type: 'string',
+            description: '"artist name, venue name, dd-mm-yy" — lowercase English, ASCII-transliterated.',
+          },
+          reason: {
+            type: 'string',
+            description: 'Chain-of-thought reasoning about how well this event matches the query.',
+          },
+          score: {
+            type: 'object',
+            description:
+              'Event relevance scores in 0-10 range based on query intent, location, timeframe, language intent, and event quality.',
+            properties: {
+              queryIntent: {
+                type: 'integer',
+              },
+              location: {
+                type: 'integer',
+              },
+              timeframe: {
+                type: 'integer',
+              },
+              languageIntent: {
+                type: 'integer',
+              },
+              quality: {
+                type: 'integer',
+              },
+            },
+            required: [
+              'queryIntent',
+              'location',
+              'timeframe',
+              'languageIntent',
+              'quality',
+            ],
+            additionalProperties: false,
+          },
+          source: {
+            type: 'object',
+            description: 'Information about the web source of the event data.',
+            properties: {
+              name: {
+                type: 'string',
+              },
+              url: {
+                type: 'string',
+              },
+            },
+            required: ['name', 'url'],
+            additionalProperties: false,
+          },
+          price: {
+            type: 'object',
+            properties: {
+              currency: {
+                type: 'string',
+              },
+              min: {
+                type: 'number',
+              },
+              max: {
+                type: 'number',
+              },
+              free: {
+                type: 'boolean',
+              },
+            },
+            required: ['currency', 'min', 'max', 'free'],
+            additionalProperties: false,
+          },
+        },
+        required: [
+          'title',
+          'description',
+          'startsAt',
+          'venue',
+          'deduplicationKey',
+          'reason',
+          'score',
+          'source',
+        ],
+        additionalProperties: true,
+      },
+    },
+  },
+  additionalProperties: false,
+  required: ['events'],
+};
+
 /**
  * @typedef {Object} ExtractPage
  * @property {string} sourceName
@@ -66,11 +205,11 @@ export function extractEventsPrompt({
       '- Do NOT filter by relevancy — return every event you find, even low-scoring ones. Downstream stages will decide what to keep.',
       '- Do not invent details. Leave fields out rather than guess.',
       '- For each event, set source.name and source.url to the SOURCE_NAME and SOURCE_URL of the page it was extracted from, copied verbatim. ' +
-      'Never substitute another URL mentioned inside the page content. If one page yields multiple events, every event repeats the same source.',
+        'Never substitute another URL mentioned inside the page content. If one page yields multiple events, every event repeats the same source.',
       '- Recurring events: return ONE object per recurring event, not one per date. ' +
-      'Set startsAt to the earliest occurrence within the Timeframe and list every occurrence ' +
-      'that falls within the Timeframe in the "occurrences" array (ISO 8601 datetimes, chronologically sorted). ' +
-      'Omit "occurrences" for one-off events.',
+        'Set startsAt to the earliest occurrence within the Timeframe and list every occurrence ' +
+        'that falls within the Timeframe in the "occurrences" array (ISO 8601 datetimes, chronologically sorted). ' +
+        'Omit "occurrences" for one-off events.',
       '- If unsure whether something is an event, give it small score on "queryIntent"',
     ].join('\n'),
     inputFormat: [
@@ -84,28 +223,6 @@ export function extractEventsPrompt({
       "       <text>user's freeform query</text>",
       '       <timeframe from="ISO" to="ISO" />',
       '  3. An optional <expanded_queries> block listing search variations derived from the original query, possibly in different languages. Use these as additional context when scoring relevancy.',
-    ].join('\n'),
-    outputFormat: [
-      'Strict JSON of shape:',
-      '{ "events": [',
-      '  { ',
-      '    "title": string (very short — performer/group name or concise event name),',
-      '    "deduplicationKey": string (strict: "artist name, venue name, dd-mm-yy" — lowercase English),',
-      '    "description": string? (single sentence in the query language),',
-      '    "startsAt": ISO 8601 datetime string,',
-      '    "endsAt": ISO 8601 datetime string?,',
-      '    "occurrences": [ISO 8601 datetime string, ...]?,',
-      '    "venue": { "name": string, "address": string?, "city": string, "country": string? },',
-      '    "reason": string,',
-      '    "score": { "queryIntent": 0–10, "city": 0–10, "dates": 0–10, "languageIntent": 0–10, "quality": 0-10 },',
-      '    "source": { "name": string, "url": string },',
-      '    "price": { "currency": string?, "min": number?, "max": number?, "free": boolean? }?',
-      '  }',
-      '] }',
-      '"reason" must appear after "title", "description", "startAt", "endsAt", "venue" ' +
-        'and before "score" in each event object — ' +
-        'it is the chain-of-thought reasoning about how well this event matches the query. ' +
-        '"score" immediately follows.',
     ].join('\n'),
   });
 

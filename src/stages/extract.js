@@ -12,7 +12,8 @@
  * See docs/pipeline.md.
  */
 
-import { extractEventsPrompt } from '../prompts/index.js';
+import { extractEventsPrompt, extractEventsSchema } from '../prompts/index.js';
+import { structuredChat } from '../core/structured.js';
 import { eventId } from '../core/identity.js';
 import { resolveTimeframe } from '../core/timeframe.js';
 import { ProgressStage, ProgressPhase } from '../core/progress.js';
@@ -75,7 +76,14 @@ export async function extract(hits, ctx, query, opts) {
       const i = cursor++;
       const batch = batches[i];
       try {
-        const result = await extractFromBatch(batch, ctx, query, timeframe, expandedQueries, signal);
+        const result = await extractFromBatch(
+          batch,
+          ctx,
+          query,
+          timeframe,
+          expandedQueries,
+          signal,
+        );
         log.debug(
           `[extract] batch ${i + 1}/${batches.length} (${batch.length} pages) → ${result.events.length} events`,
         );
@@ -108,7 +116,10 @@ export async function extract(hits, ctx, query, opts) {
       `[extract] post-filter: ${before} → ${cleaned.length} (${before - cleaned.length} dropped: dupes or out-of-range)`,
     );
   }
-  return { events: cleaned, usage: { inputTokens: totalInput, outputTokens: totalOutput } };
+  return {
+    events: cleaned,
+    usage: { inputTokens: totalInput, outputTokens: totalOutput },
+  };
 }
 
 /**
@@ -178,41 +189,41 @@ async function extractFromBatch(batch, ctx, query, timeframe, expandedQueries, s
     })),
   });
 
-  const resp = await ctx.llm.chat({
+  const { data, usage } = await structuredChat(ctx.llm, {
     model: ctx.config.eventExtraction.model,
     system: prompt.system,
     messages: [{ role: 'user', content: prompt.user }],
-    json: true,
+    schema: extractEventsSchema,
     temperature: ctx.config.eventExtraction.temperature,
     maxTokens: ctx.config.llm.maxTokens,
     maxRetries: ctx.config.llm.maxRetries,
     signal,
   });
 
-  const json =
-    /** @type {{ events?: Array<Partial<import('../core/types.js').Event>> }} */ (
-      resp.json ?? {}
-    );
-  const raws = Array.isArray(json.events) ? json.events : [];
+  const json = /** @type {{ events: Array<Record<string, unknown>> }} */ (data);
+  const raws = json.events;
   const fetchedAt = new Date().toISOString();
 
   /** @type {import('../core/types.js').Event[]} */
   const events = [];
-  for (const r of raws) {
-    if (!r.title || !r.startsAt || !r.venue?.name || !r.venue?.city) {
-      ctx.logger.warn('Skipping event extraction due to missing required fields', JSON.stringify(r));
-      continue;
-    }
-    if (!r.source?.name || !r.source?.url) {
-      ctx.logger.warn('Skipping event extraction due to missing source info', JSON.stringify(r));
-      continue;
-    }
-    if (!r.deduplicationKey) {
-      ctx.logger.warn('Skipping event extraction due to missing deduplicationKey', JSON.stringify(r));
-      continue;
-    }
-    if (!r.score) {
-      ctx.logger.warn('Skipping event extraction due to missing score', JSON.stringify(r));
+  for (const r of /** @type {Array<Partial<import('../core/types.js').Event>>} */ (
+    raws
+  )) {
+    if (
+      !r.title ||
+      !r.description ||
+      !r.startsAt ||
+      !r.venue?.name ||
+      !r.venue?.city ||
+      !r.source?.name ||
+      !r.source?.url ||
+      !r.deduplicationKey ||
+      !r.score
+    ) {
+      ctx.logger.warn(
+        'Skipping event extraction due to missing required fields',
+        JSON.stringify(r),
+      );
       continue;
     }
     events.push({
@@ -221,18 +232,20 @@ async function extractFromBatch(batch, ctx, query, timeframe, expandedQueries, s
       deduplicationKey: r.deduplicationKey,
       description: r.description,
       startsAt: r.startsAt,
-      endsAt: r.endsAt,
-      venue: r.venue,
+      endsAt: r.endsAt || undefined,
+      venue: {
+        name: r.venue.name,
+        address: r.venue.address || undefined,
+        city: r.venue.city,
+      },
       source: { name: r.source.name, url: r.source.url, fetchedAt },
-      price: r.price,
+      price: r.price || undefined,
       reason: r.reason,
       score: r.score,
-      ...(Array.isArray(r.occurrences) && r.occurrences.length > 1
-        ? { occurrences: r.occurrences }
-        : {}),
+      occurrences: Array.isArray(r.occurrences) ? r.occurrences : undefined,
     });
   }
-  return { events, usage: resp.usage };
+  return { events, usage };
 }
 
 /**

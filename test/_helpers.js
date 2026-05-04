@@ -45,8 +45,17 @@ export function stubLLM(respond) {
   return {
     name: 'stub',
     async chat(req) {
-      const json = await respond(req);
-      return { text: typeof json === 'string' ? json : JSON.stringify(json), json, usage: { inputTokens: 0, outputTokens: 0 } };
+      const result = await respond(req);
+      if (req.tools?.length) {
+        const toolName = req.toolChoice?.name ?? req.tools[0].name;
+        return {
+          text: '',
+          json: undefined,
+          toolCalls: [{ name: toolName, input: result }],
+          usage: { inputTokens: 0, outputTokens: 0 },
+        };
+      }
+      return { text: typeof result === 'string' ? result : JSON.stringify(result), json: result, usage: { inputTokens: 0, outputTokens: 0 } };
     },
   };
 }

@@ -3,12 +3,14 @@
  * One-shot example. See docs/examples.md.
  */
 
-import { createCurator, EventState } from '../src/index.js';
+import { createCurator, DEFAULTS, EventState } from '../src/index.js';
 import { sqlite } from '../src/adapters/storage/sqlite.js';
 import { memory } from '../src/adapters/storage/memory.js';
 import { openai } from '../src/adapters/llm/openai.js';
 import { tavily } from '../src/adapters/search/tavily.js';
 import { stubLLM, stubSearch } from './_stubs.js';
+import { mergeConfig } from '../src/core/config.js';
+import { llmExpand } from '../src/strategies/queryExpansion/index.js';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -33,6 +35,15 @@ const curator = await createCurator({
   llm,
   search,
   storage,
+  strategies: {
+    queryExpansion: [llmExpand()]
+  },
+  config: mergeConfig(DEFAULTS, {
+    queryExpansion: {
+      ...DEFAULTS.queryExpansion,
+      maxQueries: 1
+    }
+  })
 });
 
 const timeframe =

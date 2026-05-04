@@ -1,5 +1,19 @@
 import { buildSystem } from './_system.js';
 
+/** @type {Record<string, unknown>} */
+export const expandQueriesSchema = {
+  type: 'object',
+  properties: {
+    queries: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Diverse web-search queries for event discovery.',
+    },
+  },
+  required: ['queries'],
+  additionalProperties: false,
+};
+
 /**
  * @typedef {Object} ExpandQueriesArgs
  * @property {string} city
@@ -42,10 +56,6 @@ export function expandQueriesPrompt({ city, queryText, timeframe, limit }) {
       '  Query: <user\'s freeform query>',
       '  Timeframe: <ISO from> to <ISO to>',
       '  Limit: <integer>',
-    ].join('\n'),
-    outputFormat: [
-      'Strict JSON, no commentary:',
-      '{ "queries": [string, ...] }',
     ].join('\n'),
     examples: [
       '<example>',

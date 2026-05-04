@@ -5,7 +5,8 @@
  */
 
 import { EventState } from '../core/eventState.js';
-import { derivePreferenceTraitsPrompt } from '../prompts/derivePreferenceTraits.js';
+import { derivePreferenceTraitsPrompt, derivePreferenceTraitsSchema } from '../prompts/derivePreferenceTraits.js';
+import { structuredChat } from '../core/structured.js';
 
 /**
  * @param {import('../core/types.js').FeedbackInput & { ref: import('../core/types.js').SavedQueryRef }} input
@@ -71,15 +72,15 @@ async function deriveTraits(sq, liked, disliked, ctx) {
       ...(d.reason ? { reason: d.reason } : {}),
     })),
   });
-  const resp = await ctx.llm.chat({
+  const { data } = await structuredChat(ctx.llm, {
     model: ctx.config.llm.model,
     system: prompt.system,
     messages: [{ role: 'user', content: prompt.user }],
-    json: true,
+    schema: derivePreferenceTraitsSchema,
     temperature: ctx.config.llm.temperature,
     maxTokens: ctx.config.llm.maxTokens,
     maxRetries: ctx.config.llm.maxRetries,
   });
-  const json = /** @type {{ traits?: string }} */ (resp.json ?? {});
+  const json = /** @type {{ traits?: string }} */ (data);
   return typeof json.traits === 'string' ? json.traits : undefined;
 }

@@ -1,5 +1,26 @@
 import { buildSystem } from './_system.js';
 
+/** @type {Record<string, unknown>} */
+export const rankByPreferenceSchema = {
+  type: 'object',
+  properties: {
+    ranked: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          rationale: { type: 'string', description: 'About five words explaining why this event matches.' },
+        },
+        required: ['id', 'rationale'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['ranked'],
+  additionalProperties: false,
+};
+
 /**
  * @typedef {Object} RankByPreferenceArgs
  * @property {string} city
@@ -51,11 +72,6 @@ export function rankByPreferencePrompt({ city, queryText, candidates, liked, dis
       '  <liked>JSON array of liked example events</liked>',
       '  <disliked>JSON array of disliked example events</disliked>',
       '  <candidates>JSON array of events to filter and rank</candidates>',
-    ].join('\n'),
-    outputFormat: [
-      'Strict JSON of shape:',
-      '{ "ranked": [ { "id": string, "rationale": string }, ... ] }',
-      'Include only events the user is likely to enjoy. Omit poor matches. Each rationale is ~5 words.',
     ].join('\n'),
   });
 

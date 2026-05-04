@@ -1,5 +1,5 @@
-export { extractEventsPrompt } from './extractEvents.js';
-export { dedupeJudgePrompt } from './dedupeJudge.js';
-export { rankByPreferencePrompt } from './rankByPreference.js';
-export { derivePreferenceTraitsPrompt } from './derivePreferenceTraits.js';
-export { expandQueriesPrompt } from './expandQueries.js';
+export { extractEventsPrompt, extractEventsSchema } from './extractEvents.js';
+export { dedupeJudgePrompt, dedupeJudgeSchema } from './dedupeJudge.js';
+export { rankByPreferencePrompt, rankByPreferenceSchema } from './rankByPreference.js';
+export { derivePreferenceTraitsPrompt, derivePreferenceTraitsSchema } from './derivePreferenceTraits.js';
+export { expandQueriesPrompt, expandQueriesSchema } from './expandQueries.js';

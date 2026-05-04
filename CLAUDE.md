@@ -43,7 +43,8 @@ The `docs/` directory is the canonical reference. Read the page that matches you
 - **Types**: [src/core/types.js](src/core/types.js) — JSDoc typedefs only, no runtime
 - **Config**: [src/core/config.js](src/core/config.js) — `DEFAULTS` is the canonical, self-documenting source of truth for every tunable
 - **Logger**: [src/core/logger.js](src/core/logger.js) — levelled `ctx.logger` built from `config.logging.level`. Stages/strategies use it instead of `console.*`
-- **Prompts**: [src/prompts/](src/prompts/) — one file per prompt, exports a function returning `{ system, user }`
+- **Prompts**: [src/prompts/](src/prompts/) — one file per prompt, exports a prompt function returning `{ system, user }` and a `*Schema` constant (JSON Schema for the response shape)
+- **Structured output**: [src/core/structured.js](src/core/structured.js) — `structuredChat(llm, { schema, ... })` wraps a JSON Schema as a tool, forces the LLM to call it, and returns typed `{ data, usage }`. All LLM call sites use this instead of raw `ctx.llm.chat()`
 - **Storage schema**: defined inline in each adapter — [src/adapters/storage/sqlite.js](src/adapters/storage/sqlite.js) and [src/adapters/storage/indexeddb.js](src/adapters/storage/indexeddb.js); state enum at [src/core/eventState.js](src/core/eventState.js); rationale in [docs/storage.md](docs/storage.md)
 - **Rank stage** combines filter + rank — there is no separate filter stage. Default chain `[rules, byDate]`; the TUI uses `[rules, llmRank]`. Rank strategies may both drop and reorder events. Don't reintroduce a filter stage. Details in [docs/strategies.md](docs/strategies.md)
 - **Apps**: front-ends live under [app/](app/) (sibling to `src/`). The TUI is the only one today — read [app/tui/CLAUDE.md](app/tui/CLAUDE.md) before touching it

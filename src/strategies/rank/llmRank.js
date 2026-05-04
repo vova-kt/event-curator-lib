@@ -10,7 +10,8 @@
  */
 
 import { EventState } from '../../core/eventState.js';
-import { rankByPreferencePrompt } from '../../prompts/rankByPreference.js';
+import { rankByPreferencePrompt, rankByPreferenceSchema } from '../../prompts/rankByPreference.js';
+import { structuredChat } from '../../core/structured.js';
 
 /** @type {import('../../core/types.js').Strategy} */
 export const llmRank = async (events, ctx, query) => {
@@ -52,19 +53,18 @@ export const llmRank = async (events, ctx, query) => {
     guidance,
   });
 
-  const resp = await ctx.llm.chat({
+  const { data, usage } = await structuredChat(ctx.llm, {
     model: ctx.config.llm.model,
     system: prompt.system,
     messages: [{ role: 'user', content: prompt.user }],
-    json: true,
+    schema: rankByPreferenceSchema,
     temperature: ctx.config.llm.temperature,
     maxTokens: ctx.config.llm.maxTokens,
     maxRetries: ctx.config.llm.maxRetries,
   });
 
-  const json = /** @type {{ ranked?: Array<{ id: string, rationale?: string }> }} */ (resp.json ?? {});
-  const ranked = json.ranked;
-  if (!Array.isArray(ranked) || ranked.length === 0) return { events, usage: resp.usage };
+  const ranked = /** @type {{ ranked: Array<{ id: string, rationale?: string }> }} */ (data).ranked;
+  if (ranked.length === 0) return { events, usage };
 
   /** @type {Map<string, import('../../core/types.js').Event>} */
   const byId = new Map(events.map((e) => [e.id, e]));
@@ -76,6 +76,5 @@ export const llmRank = async (events, ctx, query) => {
     byId.delete(r.id);
     out.push({ ...e, rationale: r.rationale });
   }
-  // Events left in `byId` were omitted by the LLM — they are dropped.
-  return { events: out, usage: resp.usage };
+  return { events: out, usage };
 };

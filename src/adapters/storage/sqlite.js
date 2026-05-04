@@ -348,7 +348,7 @@ function rowToEvent(row) {
   return {
     id: row.id,
     title: row.title,
-    description: row.description ?? undefined,
+    description: row.description ?? 'unknown',
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? undefined,
     venue: JSON.parse(row.venue_json),

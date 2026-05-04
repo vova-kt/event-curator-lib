@@ -1,5 +1,18 @@
 import { buildSystem } from './_system.js';
 
+/** @type {Record<string, unknown>} */
+export const derivePreferenceTraitsSchema = {
+  type: 'object',
+  properties: {
+    traits: {
+      type: 'string',
+      description: 'One line, <= 200 chars, comma-separated phrases capturing user taste.',
+    },
+  },
+  required: ['traits'],
+  additionalProperties: false,
+};
+
 /**
  * @typedef {Object} DerivePreferenceTraitsArgs
  * @property {string} queryText        // the user's initial freeform query, anchors the trait line's domain
@@ -38,11 +51,6 @@ export function derivePreferenceTraitsPrompt({ queryText, guidance, liked, disli
       '  <liked>[ ... ]</liked>       JSON array of liked example events',
       '  <disliked>[ ... ]</disliked> JSON array of disliked example events',
       'Either example array may be empty.',
-    ].join('\n'),
-    outputFormat: [
-      'Strict JSON of shape:',
-      '{ "traits": string }',
-      'Where `traits` is one line, <= 200 chars.',
     ].join('\n'),
   });
 

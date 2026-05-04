@@ -1,6 +1,6 @@
 # Prompts
 
-All LLM prompts live as their own files under [src/prompts/](../src/prompts/). Each file exports a single function that takes structured arguments and returns `{ system, user }`.
+All LLM prompts live as their own files under [src/prompts/](../src/prompts/). Each file exports a prompt function returning `{ system, user }` and a static `*Schema` constant (JSON Schema) that defines the expected response shape.
 
 ## Why a directory of separate files
 
@@ -8,7 +8,7 @@ All LLM prompts live as their own files under [src/prompts/](../src/prompts/). E
 - Pure functions, importable in both Node and browser builds (no `fs.readFileSync`, no bundler config).
 - Forces a single place to look when debugging "why did the LLM say X?".
 
-Each file is named `<concept>Prompt`; all inputs are explicit parameters (no env reads, no module-level state). The `system` portion carries the static contract (role, task, rules, input format, output format, examples). The `user` portion carries only per-call data. The LLM adapter handles JSON-mode wiring. For working examples read [src/prompts/](../src/prompts/) directly — pasted bodies in this doc would rot.
+Each file is named `<concept>Prompt`; all inputs are explicit parameters (no env reads, no module-level state). The `system` portion carries the static contract (role, task, rules, input format, examples). The `user` portion carries only per-call data. The schema constant defines the output shape as a JSON Schema, which is passed to the LLM as a tool definition via `structuredChat` (see [src/core/structured.js](../src/core/structured.js)). For working examples read [src/prompts/](../src/prompts/) directly — pasted bodies in this doc would rot.
 
 ## Authoring rules
 
@@ -34,7 +34,7 @@ Use this section order. Wrap each in an XML tag — Claude parses XML tags subst
 2. `<task>` — one or two sentences naming the concrete deliverable and its purpose.
 3. `<rules>` — bullet list of conditions, edge cases, what to omit, what to copy verbatim.
 4. `<input_format>` — describe the shape of the `user` message. Naming the sections is what lets `user` stay instruction-free.
-5. `<output_format>` — the exact JSON shape the model must return. Use a prose schema (field names, types, optionality with `?`, nesting) — not a JSON Schema document. Place this immediately before `<examples>` (or last) so it's the freshest context before the user input.
+5. `<output_format>` — **no longer used.** The response shape is defined by the exported `*Schema` constant and enforced via tool calling. Omit this section.
 6. `<examples>` — optional. Wrap each in its own `<example>` tag inside `<examples>`.
 
 Two principles for the `<rules>` section in particular:
@@ -84,17 +84,19 @@ These are tuning hints, not separate prompts. Write one prompt that works across
 ## Adding or editing a prompt
 
 1. Create or edit `src/prompts/<name>.js` so it returns `{ system, user }`. Use `buildSystem` rather than hand-building XML.
-2. Add a JSDoc `@typedef` for its arguments above the function.
-3. Use it from a stage or strategy via `ctx.llm.chat({ ...prompt, json: true })`.
-4. Treat prompts as behavior — small, focused changes; consider whether an existing test catches regressions; if not, add one.
-5. For LLM-driven stages with non-trivial output (extract today, rank next), the [eval pipeline](eval.md) is faster than re-running the full curator.
+2. Export a `*Schema` constant — a JSON Schema object describing the response shape. Use `additionalProperties: false` at every object level and `type: ['string', 'null']` for optional fields (required by OpenAI strict mode).
+3. Add a JSDoc `@typedef` for its arguments above the function.
+4. Re-export both the prompt function and the schema from `src/prompts/index.js`.
+5. Use it from a stage or strategy via `structuredChat(ctx.llm, { ...prompt, schema })` (see [src/core/structured.js](../src/core/structured.js)).
+6. Treat prompts as behavior — small, focused changes; consider whether an existing test catches regressions; if not, add one.
+7. For LLM-driven stages with non-trivial output (extract today, rank next), the [eval pipeline](eval.md) is faster than re-running the full curator.
 
 ### Checklist before merging a prompt change
 
 - [ ] `system` follows the section order above and uses XML tags.
 - [ ] `user` contains only per-call data — no instructions, no schema reminders.
 - [ ] Long-input exception applied where the variable payload is large.
-- [ ] Output schema described as prose in `<output_format>`.
+- [ ] Schema exported as a JSON Schema constant; `additionalProperties: false` at every level.
 - [ ] Rules phrased positively where possible; scope stated explicitly.
 - [ ] No closed-set string literals scattered across rules — use enums per [CLAUDE.md](../CLAUDE.md) rule 4.
 - [ ] `npm run typecheck` and `npm test` pass.

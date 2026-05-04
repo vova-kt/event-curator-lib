@@ -56,7 +56,7 @@ export default function QueryEditorScreen({ existing, onSave, onSaveAndRun, onCa
     queryText: existing?.queryText ?? '',
     days: String(existing?.days ?? DEFAULTS.pipeline.defaultRollingDays),
     city: existing?.city ?? '',
-    limit: String(existing?.limit ?? DEFAULTS.pipeline.defaultLimit),
+    limit: String(existing?.limit ?? DEFAULTS.pipeline.maxEvents),
     excludeKeywords: csv(existing?.excludeKeywords ?? []),
     excludeVenues: csv(existing?.excludeVenues ?? []),
     priceMin: existing?.price?.min !== undefined ? String(existing.price.min) : '',

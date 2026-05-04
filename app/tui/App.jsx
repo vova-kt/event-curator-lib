@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import { createCurator, DEFAULTS, EventState, llmRank, rules } from '../../src/index.js';
+import { createCurator, EventState, llmRank, rules } from '../../src/index.js';
 import { sqlite } from '../../src/adapters/storage/sqlite.js';
 import { memory } from '../../src/adapters/storage/memory.js';
 import { openai } from '../../src/adapters/llm/openai.js';

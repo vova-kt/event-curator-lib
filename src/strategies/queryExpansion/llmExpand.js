@@ -7,7 +7,8 @@
  * `templates` strategy so a transient LLM hiccup doesn't reduce discovery to zero queries.
  */
 
-import { expandQueriesPrompt } from '../../prompts/index.js';
+import { expandQueriesPrompt, expandQueriesSchema } from '../../prompts/index.js';
+import { structuredChat } from '../../core/structured.js';
 import { resolveTimeframe } from '../../core/timeframe.js';
 import { templates } from './templates.js';
 
@@ -27,6 +28,9 @@ export function llmExpand() {
       const parsed = safeParseQueries(cached);
       if (parsed) return { queries: parsed.slice(0, cap) };
     }
+    if (ctx.config.queryExpansion.maxQueries > 1) {
+      return { queries: [query.queryText] };
+    }
 
     try {
       const prompt = expandQueriesPrompt({
@@ -35,23 +39,22 @@ export function llmExpand() {
         timeframe: tf,
         limit: cap,
       });
-      const resp = await ctx.llm.chat({
+      const { data, usage } = await structuredChat(ctx.llm, {
         model: ctx.config.queryExpansion.model,
         system: prompt.system,
         messages: [{ role: 'user', content: prompt.user }],
-        json: true,
+        schema: expandQueriesSchema,
         temperature: ctx.config.queryExpansion.temperature,
         maxTokens: ctx.config.queryExpansion.maxTokens,
         maxRetries: ctx.config.llm.maxRetries,
       });
-      const json = /** @type {{ queries?: unknown }} */ (resp.json ?? {});
-      const queries = sanitize(json.queries);
+      const queries = sanitize(/** @type {{ queries?: unknown }} */ (data).queries);
       if (queries.length === 0) {
         throw new Error('LLM returned no usable queries');
       }
       const sliced = queries.slice(0, cap);
       await ctx.storage.setKV(key, JSON.stringify(sliced));
-      return { queries: sliced, usage: resp.usage };
+      return { queries: sliced, usage };
     } catch (err) {
       if (ctx.config.dev) throw err;
       ctx.logger.warn('[llmExpand] LLM failed, falling back to templates:', err instanceof Error ? err.message : err);

@@ -1,5 +1,22 @@
 import { buildSystem } from './_system.js';
 
+/** @type {Record<string, unknown>} */
+export const dedupeJudgeSchema = {
+  type: 'object',
+  properties: {
+    groups: {
+      type: 'array',
+      items: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+      description: 'Each inner array is a cluster of event IDs referring to the same real-world event.',
+    },
+  },
+  required: ['groups'],
+  additionalProperties: false,
+};
+
 /**
  * @typedef {Object} DedupeJudgeArgs
  * @property {Array<{ id: string, title: string, startsAt: string, venue: { name: string, city: string } }>} candidates
@@ -26,10 +43,6 @@ export function dedupeJudgePrompt({ candidates }) {
       '- Preserve ids verbatim.',
     ].join('\n'),
     inputFormat: 'The user message contains a single <candidates> block with a JSON array of candidate events. Each candidate has: { id, title, startsAt, venue: { name, city } }.',
-    outputFormat: [
-      'Strict JSON of shape:',
-      '{ "groups": [ [id1, id2, ...], [id3], ... ] }',
-    ].join('\n'),
   });
 
   const user = [
