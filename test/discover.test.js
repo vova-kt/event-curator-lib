@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { discover } from '../src/stages/discover.js';
+import { searchByQueries } from '../src/stages/searchByQueries.js';
 import { DEFAULTS, mergeConfig } from '../src/core/config.js';
 import { memory } from '../src/adapters/storage/memory.js';
 import { silentLogger } from './_helpers.js';
@@ -12,7 +12,7 @@ const defaultQuery = {
 };
 
 /**
- * @param {{ queryExpansion: import('../src/core/types.js').QueryExpansionStrategy[], search: import('../src/core/types.js').SearchAdapter[] }} opts
+ * @param {{ queryExpansion: import('../src/core/types.js').SearchQueriesStrategy[], search: import('../src/core/types.js').SearchAdapter[] }} opts
  */
 function makeCtx({ queryExpansion, search }) {
   return /** @type {any} */ ({
@@ -43,7 +43,7 @@ test('discover: dedupes queries from multiple strategies before fan-out', async 
   const a = expansion(['Comedy Events in Berlin', 'standup Berlin']);
   const b = expansion(['comedy events in berlin', 'open mic Berlin']);
 
-  const { queries } = await discover(makeCtx({ queryExpansion: [a, b], search: [search] }), defaultQuery);
+  const { queries } = await searchByQueries(makeCtx({ searchQueries: [a, b], search: [search] }), defaultQuery);
 
   assert.deepEqual(seen, ['Comedy Events in Berlin', 'standup Berlin', 'open mic Berlin']);
   assert.deepEqual(queries, ['Comedy Events in Berlin', 'standup Berlin', 'open mic Berlin']);
@@ -51,7 +51,7 @@ test('discover: dedupes queries from multiple strategies before fan-out', async 
 
 test('discover: throws when queryExpansion is empty (misconfiguration)', async () => {
   await assert.rejects(
-    () => discover(makeCtx({ queryExpansion: [], search: [] }), defaultQuery),
+    () => searchByQueries(makeCtx({ searchQueries: [], search: [] }), defaultQuery),
     /no queryExpansion strategies/,
   );
 });
@@ -73,8 +73,8 @@ test('discover: collapses hits whose URLs differ only by tracking params, www, c
       return variants.map((url, i) => ({ url, title: `t${i}`, snippet: '', source: 'spy' }));
     },
   };
-  const { hits } = await discover(makeCtx({
-    queryExpansion: [expansion(['q'])],
+  const { hits } = await searchByQueries(makeCtx({
+    searchQueries: [expansion(['q'])],
     search: [search],
   }), defaultQuery);
 
@@ -97,8 +97,8 @@ test('discover: preserves non-tracking query params and keeps the first-seen var
       ];
     },
   };
-  const { hits } = await discover(makeCtx({
-    queryExpansion: [expansion(['q'])],
+  const { hits } = await searchByQueries(makeCtx({
+    searchQueries: [expansion(['q'])],
     search: [search],
   }), defaultQuery);
 
@@ -118,8 +118,8 @@ test('discover: unparseable URLs fall back to exact-match dedup', async () => {
       ];
     },
   };
-  const { hits } = await discover(makeCtx({
-    queryExpansion: [expansion(['q'])],
+  const { hits } = await searchByQueries(makeCtx({
+    searchQueries: [expansion(['q'])],
     search: [search],
   }), defaultQuery);
 
@@ -139,7 +139,7 @@ test('discover: a failing expansion strategy is skipped, others continue', async
   const failing = () => { throw new Error('strategy failed'); };
   const ok = expansion(['working query']);
 
-  await discover(makeCtx({ queryExpansion: [failing, ok], search: [search] }), defaultQuery);
+  await searchByQueries(makeCtx({ searchQueries: [failing, ok], search: [search] }), defaultQuery);
 
   assert.deepEqual(seen, ['working query']);
 });

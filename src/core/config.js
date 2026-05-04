@@ -64,6 +64,20 @@ export const DEFAULTS = Object.freeze({
     maxTokens: 1024,
   },
 
+  /** Post-discover filtering: LLM relevance scoring + full-content fetch. */
+  searchEnhance: {
+    /** Composite relevance score (0–1) below which hits are dropped. */
+    relevanceThreshold: 0.5,
+    /** Fetch full page content for the top N hits after scoring. */
+    maxFetch: 10,
+    /** Model for the relevance-scoring LLM call. */
+    model: 'gpt-5.4-mini',
+    /** Sampling temperature for relevance scoring. */
+    temperature: 0.0,
+    /** Max output tokens for the relevance-scoring call. */
+    maxTokens: 2048,
+  },
+
   /** Pipeline-stage tuning. See [docs/pipeline.md](../../docs/pipeline.md). */
   pipeline: {
     /** Number of curated events returned when the caller doesn't set `Query.limit`. */

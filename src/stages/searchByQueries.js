@@ -12,15 +12,17 @@ import { ProgressStage, ProgressPhase } from '../core/progress.js';
  * @param {import('../core/types.js').RunOptions} [opts]
  * @returns {Promise<{ hits: import('../core/types.js').SearchHit[], queries: string[], usage: import('../core/types.js').LLMUsage }>}
  */
-export async function discover(ctx, query, opts) {
+export async function searchByQueries(ctx, query, opts) {
   const emit = opts?.onProgress ?? (() => {});
   const signal = opts?.signal;
   const log = ctx.logger;
 
   emit({ stage: ProgressStage.QUERIES, phase: ProgressPhase.START });
-  const { queries, usage } = await buildQueries(ctx, query);
+  const { queries, usage: qxUsage } = await buildQueries(ctx, query);
   emit({ stage: ProgressStage.QUERIES, phase: ProgressPhase.DONE, count: queries.length });
   log.debug('[discover] queries', queries);
+  let totalInput = qxUsage.inputTokens;
+  let totalOutput = qxUsage.outputTokens;
 
   const total = ctx.search.length * queries.length;
   emit({ stage: ProgressStage.SEARCH, phase: ProgressPhase.START, total });
@@ -49,7 +51,8 @@ export async function discover(ctx, query, opts) {
   const deduped = dedupeByUrl(all);
   emit({ stage: ProgressStage.SEARCH, phase: ProgressPhase.DONE, count: deduped.length });
   log.debug(`[discover] ${all.length} raw hits → ${deduped.length} after url-dedupe`);
-  return { hits: deduped, queries, usage };
+
+  return { hits: deduped, queries, usage: { inputTokens: totalInput, outputTokens: totalOutput } };
 }
 
 /**
@@ -58,7 +61,7 @@ export async function discover(ctx, query, opts) {
  * @returns {Promise<{ queries: string[], usage: import('../core/types.js').LLMUsage }>}
  */
 async function buildQueries(ctx, query) {
-  const strategies = ctx.strategies.queryExpansion;
+  const strategies = ctx.strategies.searchQueriesExpand;
   if (!strategies || strategies.length === 0) {
     throw new Error('discover: no queryExpansion strategies configured');
   }

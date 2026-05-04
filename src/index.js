@@ -9,6 +9,7 @@ import { recordFeedback } from './stages/feedback.js';
 export { DEFAULTS } from './core/config.js';
 export { createContext } from './core/context.js';
 export { llmRank, byDate, rules } from './strategies/rank/index.js';
+export { searchRelevanceStrategy } from './strategies/search/index.js';
 export { EventState, EVENT_STATE_VALUES } from './core/eventState.js';
 
 /**

@@ -1,4 +1,4 @@
-import { llmExpand } from '../../../src/strategies/queryExpansion/index.js';
+import { searchQueriesExpand } from '../../../src/strategies/queryExpansion/index.js';
 import { loadExpandGoldenFixture } from '../../core/fixtures.js';
 import { writeRun } from '../../core/runs.js';
 import { RunKind } from '../../core/runKind.js';
@@ -30,7 +30,7 @@ export async function runOne(
     qeModel: model,
     qeMaxQueries: limit,
   });
-  const { queries, usage } = await llmExpand()(ctx, cfg.query);
+  const { queries, usage } = await searchQueriesExpand()(ctx, cfg.query);
   const elapsedMs = Date.now() - start;
 
   const report = buildReport({

@@ -14,7 +14,7 @@ A curator is a **pipeline** wrapping three pluggable I/O adapters (search, LLM, 
 │ public API       src/index.js  →  createCurator()      │
 ├────────────────────────────────────────────────────────┤
 │ pipeline         src/core/pipeline.js                  │
-│                    └── src/stages/{discover,extract,   │
+│                    └── src/stages/{searchByQueries,extract,   │
 │                                    dedupe,rank,        │
 │                                    feedback}.js        │
 ├────────────────────────────────────────────────────────┤
@@ -41,7 +41,7 @@ Higher layers depend on lower ones, never the other way around. Stages depend on
 ## Data flow
 
 ```
-Query  ─▶  discover  ─▶  extract  ─▶  dedupe  ─▶  rank  ─▶  Result
+Query  ─▶  searchByQueries  ─▶  extract  ─▶  dedupe  ─▶  rank  ─▶  Result
             │              │            │          │
             ▼              ▼            ▼          ▼
          search         LLM +        strategies  strategies + savedQuery

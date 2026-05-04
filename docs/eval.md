@@ -77,7 +77,7 @@ Defined in [eval/core/metrics.js](../eval/core/metrics.js); field comparators in
 
 ## Query-expansion eval
 
-[eval/scripts/expand/](../eval/scripts/expand/) calls the `llmExpand` strategy directly with a real LLM, then reports four metrics over the returned queries: golden coverage (against a hand-curated must-have list), pairwise diversity, constraint compliance against the prompt rules in [src/prompts/expandQueries.js](../src/prompts/expandQueries.js), and language coverage against a per-config `expectedLanguages` list (ISO 639-3 codes the city's audience speaks). Language detection uses Unicode-block fast paths for non-Latin scripts and `franc-min` for Latin-script disambiguation, biased toward the expected set so franc's noisy short-text guesses don't wander into irrelevant languages — see [eval/core/queryHeuristics.js](../eval/core/queryHeuristics.js).
+[eval/scripts/expand/](../eval/scripts/expand/) calls the `llmExpand` strategy directly with a real LLM, then reports four metrics over the returned queries: golden coverage (against a hand-curated must-have list), pairwise diversity, constraint compliance against the prompt rules in [src/prompts/searchQueries.js](../src/prompts/expandQueries.js), and language coverage against a per-config `expectedLanguages` list (ISO 639-3 codes the city's audience speaks). Language detection uses Unicode-block fast paths for non-Latin scripts and `franc-min` for Latin-script disambiguation, biased toward the expected set so franc's noisy short-text guesses don't wander into irrelevant languages — see [eval/core/queryHeuristics.js](../eval/core/queryHeuristics.js).
 
 The script accepts an array of query configs and dispatches them in parallel, emitting a per-config report plus a generalized aggregate summary (averaged quality, total violations, per-config one-liner) so a single run answers "did this prompt change improve things on average across the test set?".
 
@@ -85,7 +85,7 @@ Fixtures: `<slug>.expand-input.json` (city, queryText, timeframe, optional limit
 
 ## Why the eval calls `extract()` directly
 
-`extract(hits, ctx)` ([src/stages/extract.js](../src/stages/extract.js)) is decoupled from discover/dedupe/rank/storage. The eval builds a minimal `ctx` (`{ llm, config, logger, query }`) via [eval/core/ctx.js](../eval/core/ctx.js) and calls the function directly, bypassing the orchestrator. No need for the stub-everything pattern from `test/pipeline_e2e.test.js`.
+`extract(hits, ctx)` ([src/stages/extract.js](../src/stages/extract.js)) is decoupled from searchByQueries/dedupe/rank/storage. The eval builds a minimal `ctx` (`{ llm, config, logger, query }`) via [eval/core/ctx.js](../eval/core/ctx.js) and calls the function directly, bypassing the orchestrator. No need for the stub-everything pattern from `test/pipeline_e2e.test.js`.
 
 ## Future: ranking eval
 

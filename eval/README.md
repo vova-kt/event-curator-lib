@@ -36,7 +36,7 @@ node                     eval/scripts/promote-golden.js
 
 1. Hand-author `eval/fixtures/<slug>.expand-input.json` with shape `{ slug, query: { city, queryText }, timeframe, limit?, nativeLanguageHints? }`.
 2. Set `config.runExpand.fixture` to that slug and run `eval/scripts/expand/index.js`. First run prints metrics minus golden coverage — hand-pick the must-have phrasings into `eval/fixtures/<slug>.expand-golden.json` (`{ slug, queries: [...] }`) and commit.
-3. Iterate on [src/prompts/expandQueries.js](../src/prompts/expandQueries.js), rerun, compare metrics.
+3. Iterate on [src/prompts/searchQueries.js](../src/prompts/expandQueries.js), rerun, compare metrics.
 
 ## Adding a new eval kind
 

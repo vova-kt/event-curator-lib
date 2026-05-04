@@ -9,8 +9,9 @@ import { openai } from '../src/adapters/llm/openai.js';
 import { tavily } from '../src/adapters/search/tavily.js';
 import { stubLLM, stubSearch } from './_stubs.js';
 import { mergeConfig } from '../src/core/config.js';
-import { llmExpand } from '../src/strategies/queryExpansion/index.js';
+import { searchQueriesExpand } from '../src/strategies/queryExpansion/index.js';
 import { brave } from '../src/adapters/search/brave.js';
+import { searchRelevanceStrategy } from '../src/index.js';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -51,7 +52,12 @@ const curator = await createCurator({
   search: options.search,
   storage: options.storage,
   strategies: {
-    queryExpansion: [llmExpand()],
+    ...(options.dry
+      ? {}
+      : {
+          searchQueriesExpand: [searchQueriesExpand()],
+          searchQueriesEnhance: [searchRelevanceStrategy()],
+        }),
   },
   config: mergeConfig(DEFAULTS, {
     search: {
@@ -135,7 +141,7 @@ function requireEnv(name) {
  * @param {import("../src/core/types.js").EventPrice} [price]
  */
 function formatPrice(price) {
-  if (!price) return ''
+  if (!price) return '';
   return price.free
     ? 'free'
     : price.min !== undefined

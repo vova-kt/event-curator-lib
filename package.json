@@ -20,7 +20,8 @@
     "./adapters/storage/memory": "./src/adapters/storage/memory.js",
     "./strategies/queryExpansion": "./src/strategies/queryExpansion/index.js",
     "./strategies/dedupe": "./src/strategies/dedupe/index.js",
-    "./strategies/rank": "./src/strategies/rank/index.js"
+    "./strategies/rank": "./src/strategies/rank/index.js",
+    "./strategies/discoverFilter": "./src/strategies/discoverFilter/index.js"
   },
   "files": [
     "src",
@@ -38,7 +39,9 @@
     "example:cli": "tsx app/tui/index.jsx"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.5.0",
     "better-sqlite3": "^11.3.0",
+    "linkedom": "^0.18.0",
     "openai": "^4.70.0",
     "snowball-stemmers": "^0.6.0"
   },

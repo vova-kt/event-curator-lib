@@ -3,7 +3,7 @@
  */
 
 /**
- * @returns {import('../../core/types.js').QueryExpansionStrategy}
+ * @returns {import('../../core/types.js').SearchQueriesStrategy}
  */
 export function templates() {
   return function templatesStrategy(_ctx, query) {

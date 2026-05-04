@@ -2,7 +2,8 @@
  * Pipeline orchestrator. See docs/pipeline.md.
  */
 
-import { discover } from '../stages/discover.js';
+import { searchByQueries } from '../stages/searchByQueries.js';
+import { searchRankSources } from '../stages/searchRankSources.js';
 import { extract } from '../stages/extract.js';
 import { dedupe } from '../stages/dedupe.js';
 import { rank } from '../stages/rank.js';
@@ -36,11 +37,14 @@ export async function runCuration(ctx, query, opts) {
   log.info(`[pipeline] start city="${query.city}" query="${query.queryText}"`);
   log.debug('[pipeline] query', query);
 
-  const { hits, queries, usage: discoverUsage } = await discover(ctx, query, opts);
+  const { hits, queries, usage: discoverUsage } = await searchByQueries(ctx, query, opts);
   log.info(`[pipeline] discover → ${hits.length} hits`);
 
-  emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.START, total: hits.length });
-  const { events: extracted, usage: extractUsage } = await extract(hits, ctx, query, {
+  const { hits: filtered, usage: filterUsage } = await searchRankSources(hits, ctx, query, opts);
+  log.info(`[pipeline] discoverRankFilter → ${filtered.length} hits`);
+
+  emit({ stage: ProgressStage.EXTRACT, phase: ProgressPhase.START, total: filtered.length });
+  const { events: extracted, usage: extractUsage } = await extract(filtered, ctx, query, {
     expandedQueries: queries,
     signal: opts?.signal,
     onProgress: opts?.onProgress,
@@ -72,7 +76,7 @@ export async function runCuration(ctx, query, opts) {
   emit({ stage: ProgressStage.PERSIST, phase: ProgressPhase.DONE, count: events.length });
   logEvents(log, 'persist', events);
 
-  return { events, usage: sumUsage([discoverUsage, extractUsage, dedupeUsage, rankUsage]) };
+  return { events, usage: sumUsage([discoverUsage, filterUsage, extractUsage, dedupeUsage, rankUsage]) };
 }
 
 /**

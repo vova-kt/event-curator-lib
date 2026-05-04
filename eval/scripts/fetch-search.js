@@ -18,13 +18,13 @@
 
 import { tavily } from '../../src/adapters/search/tavily.js';
 import { firecrawl } from '../../src/adapters/search/firecrawl.js';
-import { templates, llmExpand } from '../../src/strategies/queryExpansion/index.js';
+import { templates, searchQueriesExpand } from '../../src/strategies/queryExpansion/index.js';
 import { requireEnv } from '../core/env.js';
 import { makeSlug } from '../core/slug.js';
 import { writeSearchFixture } from '../core/fixtures.js';
 import { createEvalContext } from '../core/ctx.js';
 import { DEFAULTS } from '../../src/index.js';
-import { dedupeByUrl } from '../../src/stages/discover.js';
+import { dedupeByUrl } from '../../src/stages/searchByQueries.js';
 
 /** Shared settings applied to every query. */
 const shared = {
@@ -141,14 +141,14 @@ function buildSearchAdapter(name) {
 
 /**
  * @param {string} name
- * @returns {import('../../src/core/types.js').QueryExpansionStrategy}
+ * @returns {import('../../src/core/types.js').SearchQueriesStrategy}
  */
 function buildExpandStrategy(name) {
   switch (name) {
     case 'templates':
       return templates();
     case 'llm':
-      return llmExpand();
+      return searchQueriesExpand();
     default:
       throw new Error(`unknown expand=${name}; supported: templates, llm`);
   }

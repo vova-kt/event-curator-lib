@@ -10,7 +10,7 @@ A factory function returning a plain object is the smallest interface that lets 
 
 ### Search
 
-[src/adapters/search/](../src/adapters/search/). Used by the discover stage — see [pipeline.md](pipeline.md). The curator accepts an *array* of search adapters and fans every expanded query across all of them. Rate limits / timeouts are the adapter's responsibility.
+[src/adapters/search/](../src/adapters/search/). Used by the searchByQueries stage — see [pipeline.md](pipeline.md). The curator accepts an *array* of search adapters and fans every expanded query across all of them. Rate limits / timeouts are the adapter's responsibility.
 
 Built-ins:
 

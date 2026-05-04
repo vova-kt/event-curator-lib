@@ -241,7 +241,8 @@
 
 /**
  * @typedef {Object} Strategies
- * @property {QueryExpansionStrategy[]} queryExpansion
+ * @property {SearchQueriesStrategy[]} searchQueriesExpand
+ * @property {SearchSourcesEnchanceStrategy[]} searchQueriesEnhance
  * @property {Strategy[]} dedupe
  * @property {Strategy[]} rank
  */
@@ -253,7 +254,7 @@
  */
 
 /**
- * @typedef {Object} QueryExpansionResult
+ * @typedef {Object} SearchQueriesResult
  * @property {string[]} queries
  * @property {LLMUsage} [usage]
  */
@@ -263,7 +264,17 @@
  */
 
 /**
- * @typedef {(ctx: Ctx, query: Query) => Promise<QueryExpansionResult> | QueryExpansionResult} QueryExpansionStrategy
+ * @typedef {(ctx: Ctx, query: Query) => Promise<SearchQueriesResult> | SearchQueriesResult} SearchQueriesStrategy
+ */
+
+/**
+ * @typedef {Object} SearchEnhanceResult
+ * @property {SearchHit[]} hits
+ * @property {LLMUsage} [usage]
+ */
+
+/**
+ * @typedef {(hits: SearchHit[], ctx: Ctx, query: Query) => Promise<SearchEnhanceResult> | SearchEnhanceResult} SearchSourcesEnchanceStrategy
  */
 
 /**
@@ -281,6 +292,7 @@
  * @property {{ model: string, temperature: number, maxTokens: number, maxRetries: number, batchInputTokens: number, charsPerToken: number }} llm
  * @property {{ model: string, temperature: number }} eventExtraction
  * @property {{ maxResultsPerQuery: number, timeoutMs: number, model: string, maxQueries: number, temperature: number, maxTokens: number }} search
+ * @property {{ relevanceThreshold: number, maxFetch: number, model: string, temperature: number, maxTokens: number }} searchEnhance
  * @property {{ maxEvents: number, defaultRollingDays: number, maxWorkers: number }} pipeline
  * @property {{ jaccardThreshold: number }} dedupe
  * @property {{ deriveTraits: boolean, traitsRefreshThreshold: number }} preferences
@@ -289,7 +301,7 @@
  */
 
 /**
- * @typedef {'queries'|'search'|'extract'|'dedupe'|'rank'|'persist'} ProgressStage
+ * @typedef {'queries'|'search'|'searchEnhance'|'extract'|'dedupe'|'rank'|'persist'} ProgressStage
  *   Runtime values exported as the `ProgressStage` enum from core/progress.js.
  */
 

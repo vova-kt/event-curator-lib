@@ -38,7 +38,7 @@ export function createEvalContext({
     llm: openai({ apiKey }),
     storage: nullStorage,
     search: [],
-    strategies: { queryExpansion: [], dedupe: [], rank: [] },
+    strategies: { searchQueriesExpand: [], dedupe: [], rank: [] },
     config: mergeConfig(DEFAULTS, {
       search: {
         ...DEFAULTS.search,

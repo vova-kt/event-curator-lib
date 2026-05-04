@@ -1,2 +1,2 @@
 export { templates } from './templates.js';
-export { llmExpand } from './llmExpand.js';
+export { searchQueriesExpand } from './searchQueriesExpand.js';

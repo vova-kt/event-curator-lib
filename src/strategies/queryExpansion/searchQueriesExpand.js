@@ -15,9 +15,9 @@ import { templates } from './templates.js';
 const CACHE_PREFIX = 'qx:llmExpand:v2';
 
 /**
- * @returns {import('../../core/types.js').QueryExpansionStrategy}
+ * @returns {import('../../core/types.js').SearchQueriesStrategy}
  */
-export function llmExpand() {
+export function searchQueriesExpand() {
   return async function llmExpandStrategy(ctx, query) {
     const cap = ctx.config.search.maxQueries;
     if (cap < 1) {

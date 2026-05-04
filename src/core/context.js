@@ -7,7 +7,7 @@ import { DEFAULTS, mergeConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { byDedupKey } from '../strategies/dedupe/index.js';
 import { byDate, rules } from '../strategies/rank/index.js';
-import { llmExpand, templates } from '../strategies/queryExpansion/index.js';
+import { searchQueriesExpand, templates } from '../strategies/queryExpansion/index.js';
 
 /**
  * @param {{
@@ -22,10 +22,19 @@ import { llmExpand, templates } from '../strategies/queryExpansion/index.js';
 export function createContext(opts) {
   const config = mergeConfig(DEFAULTS, opts.config);
   const logger = createLogger(config.logging.level, config.logging.file);
-  const strategies = {
-    queryExpansion: opts.strategies?.queryExpansion ?? [llmExpand(), templates()],
-    dedupe: opts.strategies?.dedupe ?? [byDedupKey(config.dedupe.jaccardThreshold)],
-    rank: opts.strategies?.rank ?? [rules, byDate],
+  return {
+    llm: opts.llm,
+    search: opts.search,
+    storage: opts.storage,
+    strategies: {
+      searchQueriesExpand: opts.strategies?.searchQueriesExpand ?? [
+        searchQueriesExpand(),
+      ],
+      searchQueriesEnhance: opts.strategies?.searchQueriesEnhance ?? [],
+      dedupe: opts.strategies?.dedupe ?? [byDedupKey(config.dedupe.jaccardThreshold)],
+      rank: opts.strategies?.rank ?? [rules, byDate],
+    },
+    config,
+    logger,
   };
-  return { llm: opts.llm, search: opts.search, storage: opts.storage, strategies, config, logger };
 }

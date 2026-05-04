@@ -4,12 +4,13 @@
 
 /** @enum {string} */
 export const ProgressStage = Object.freeze({
-  QUERIES: 'queries',
-  SEARCH:  'search',
-  EXTRACT: 'extract',
-  DEDUPE:  'dedupe',
-  RANK:    'rank',
-  PERSIST: 'persist',
+  QUERIES:          'queries',
+  SEARCH:           'search',
+  SEARCH_ENHANCE:  'searchEnhance',
+  EXTRACT:          'extract',
+  DEDUPE:           'dedupe',
+  RANK:             'rank',
+  PERSIST:          'persist',
 });
 
 /** @enum {string} */
@@ -23,6 +24,7 @@ export const ProgressPhase = Object.freeze({
 export const PROGRESS_STAGE_ORDER = Object.freeze([
   ProgressStage.QUERIES,
   ProgressStage.SEARCH,
+  ProgressStage.SEARCH_ENHANCE,
   ProgressStage.EXTRACT,
   ProgressStage.DEDUPE,
   ProgressStage.RANK,
