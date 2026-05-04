@@ -18,7 +18,7 @@ Manual-only pipelines for evaluating LLM-driven stages (extract today, rank next
 ```
 eval/
   core/        # reusable across eval kinds (slug, fixtures, runs, runKind, matching, metrics, report, ctx, env)
-  scripts/     # CLIs: fetch-search, run-extract, run-expand, promote-golden
+  scripts/     # CLIs: fetch-search, run-extract, expand/, promote-golden
   config.js    # parameters per script
   fixtures/    # committed; subfolders per eval kind (search/, extract/, expand/)
   runs/        # gitignored
@@ -77,11 +77,11 @@ Defined in [eval/core/metrics.js](../eval/core/metrics.js); field comparators in
 
 ## Query-expansion eval
 
-[eval/scripts/run-expand.js](../eval/scripts/run-expand.js) calls the `llmExpand` strategy directly with a real LLM, then reports four metrics over the returned queries: golden coverage (against a hand-curated must-have list), pairwise diversity, constraint compliance against the prompt rules in [src/prompts/expandQueries.js](../src/prompts/expandQueries.js), and language coverage against a per-config `expectedLanguages` list (ISO 639-3 codes the city's audience speaks). Language detection uses Unicode-block fast paths for non-Latin scripts and `franc-min` for Latin-script disambiguation, biased toward the expected set so franc's noisy short-text guesses don't wander into irrelevant languages — see [eval/core/queryHeuristics.js](../eval/core/queryHeuristics.js).
+[eval/scripts/expand/](../eval/scripts/expand/) calls the `llmExpand` strategy directly with a real LLM, then reports four metrics over the returned queries: golden coverage (against a hand-curated must-have list), pairwise diversity, constraint compliance against the prompt rules in [src/prompts/expandQueries.js](../src/prompts/expandQueries.js), and language coverage against a per-config `expectedLanguages` list (ISO 639-3 codes the city's audience speaks). Language detection uses Unicode-block fast paths for non-Latin scripts and `franc-min` for Latin-script disambiguation, biased toward the expected set so franc's noisy short-text guesses don't wander into irrelevant languages — see [eval/core/queryHeuristics.js](../eval/core/queryHeuristics.js).
 
 The script accepts an array of query configs and dispatches them in parallel, emitting a per-config report plus a generalized aggregate summary (averaged quality, total violations, per-config one-liner) so a single run answers "did this prompt change improve things on average across the test set?".
 
-Fixtures: `<slug>.expand-input.json` (city, queryText, timeframe, optional limit and `nativeLanguageHints`) and `<slug>.expand-golden.json` (`{ queries: string[] }`). Both are hand-authored — there is no fetch step, since the input to expansion is just the query itself. Configure via `config.runExpand`; run with `node --env-file=.env.dev eval/scripts/run-expand.js`.
+Fixtures: `<slug>.expand-input.json` (city, queryText, timeframe, optional limit and `nativeLanguageHints`) and `<slug>.expand-golden.json` (`{ queries: string[] }`). Both are hand-authored — there is no fetch step, since the input to expansion is just the query itself. Configure via `config.runExpand`; run with `node --env-file=.env.dev eval/scripts/expand/index.js`.
 
 ## Why the eval calls `extract()` directly
 
